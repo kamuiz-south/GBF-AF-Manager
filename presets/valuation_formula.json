@@ -1,0 +1,119 @@
+{
+  "group1Multiplier": 0.7,
+  "group2Multiplier": 1,
+  "group3Multiplier": 1.1,
+  "skillMultipliers": {
+    "1011": 3,
+    "1061": 1.5,
+    "1071": 0,
+    "1081": 3,
+    "1121": 0.5,
+    "1131": 3.5,
+    "2011": 6.5,
+    "2021": 4,
+    "2041": 5,
+    "2061": 0,
+    "2081": 0,
+    "2091": 0,
+    "2101": 0,
+    "2111": 5.5,
+    "2121": 4,
+    "2131": 0,
+    "2141": 6,
+    "2151": 2,
+    "2161": 6.5,
+    "2171": 2,
+    "5002": 0,
+    "5003": 0,
+    "5004": 0,
+    "5005": 2,
+    "5007": 1.4,
+    "5010": 0.8,
+    "5011": 0.8,
+    "5012": 0,
+    "5013": 0,
+    "5018": 2,
+    "5019": 3,
+    "5020": 3,
+    "5021": 4,
+    "5022": 0,
+    "5023": 0.8,
+    "5024": 3.5,
+    "5025": 2,
+    "5027": 0,
+    "5028": 2
+  },
+  "qualityValues": {
+    "1": 1,
+    "2": 1.01,
+    "3": 1.03,
+    "4": 1.1,
+    "5": 1.25
+  },
+  "exceptions": [
+    {
+      "conditionGroup": 2,
+      "conditionSkillName": 2151,
+      "targetGroup": 1,
+      "targetSkillName": 1111,
+      "scoreModifier": -8,
+      "isSubtract": true
+    },
+    {
+      "conditionGroup": 2,
+      "conditionSkillName": 2151,
+      "targetGroup": 1,
+      "targetSkillName": 1021,
+      "scoreModifier": -4,
+      "isSubtract": true
+    },
+    {
+      "conditionGroup": 2,
+      "conditionSkillName": 2151,
+      "targetGroup": 1,
+      "targetSkillName": 1091,
+      "scoreModifier": -5,
+      "isSubtract": true
+    },
+    {
+      "conditionGroup": 2,
+      "conditionSkillName": 2151,
+      "targetGroup": 1,
+      "targetSkillName": 1141,
+      "scoreModifier": -5,
+      "isSubtract": true
+    },
+    {
+      "conditionGroup": 1,
+      "conditionSkillName": 1081,
+      "targetGroup": 1,
+      "targetSkillName": 1011,
+      "scoreModifier": 2,
+      "isSubtract": false
+    },
+    {
+      "conditionGroup": 1,
+      "conditionSkillName": 1081,
+      "targetGroup": 1,
+      "targetSkillName": 1131,
+      "scoreModifier": 3,
+      "isSubtract": false
+    },
+    {
+      "conditionGroup": 2,
+      "conditionSkillName": 2171,
+      "targetGroup": 3,
+      "targetSkillName": 5007,
+      "scoreModifier": 1,
+      "isSubtract": false
+    },
+    {
+      "conditionGroup": 2,
+      "conditionSkillName": 2171,
+      "targetGroup": 3,
+      "targetSkillName": 5007,
+      "scoreModifier": 1,
+      "isSubtract": false
+    }
+  ]
+}

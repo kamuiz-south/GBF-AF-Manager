@@ -27,6 +27,12 @@
 [GitHub Releases](https://github.com/kamuiz-south/GBF-AF-Manager/releases) から `AF_Collector_x.x.x.zip` をダウンロードしてください。
 - **役割**: ゲーム内画面からデータを収集し、Managerへ転送します。
 
+### 🎁 おすすめプリセット
+すぐに設定を試したい方向けのサンプルです。[presets/](./presets/) フォルダ内の JSON を Manager の設定タブからインポートして使用してください。
+- `valuation_formula.json`: 評価計算式の設定（スキルごとの乗算係数など）
+- `criteria.json`: 確保AF条件の設定（どのスキルを持つAFを残すか）
+※内容はあまり練られていません。ご自身の環境に合わせて調整して使用することを推奨します。
+
 ---
 
 ## 📖 使い方（クイックスタート）
