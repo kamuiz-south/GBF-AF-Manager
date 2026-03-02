@@ -42,7 +42,7 @@ async function handleKeepCalc(language: string) {
     const updated = runCriteriaMatcher(artifacts, conditions);
     await db.artifacts.bulkPut(updated);
     const keptCount = updated.filter(a => a.keepFlag).length;
-    alert(language === 'en' ? `Calculation complete.\nKept: ${keptCount} item(s)` : `確保フラグの一括計算が完了しました。\n確保対象: ${keptCount} 件`);
+    alert(language === 'en' ? `Calculation complete.\nKept: ${keptCount} item(s)` : `確保フラグの一括計算が完了しました。\n確保対象: ${keptCount}件`);
   } catch (e) {
     console.error(e);
     alert(language === 'en' ? 'An error occurred.' : 'エラーが発生しました。');
@@ -100,8 +100,8 @@ function AppInner() {
   useEffect(() => {
     const d = { ...DEFAULT_DESIGN, ...(dbSettings?.design ?? {}) };
     const root = document.documentElement;
-    root.style.setProperty('--font-size-main', `${d.fontSizeMain} px`);
-    root.style.setProperty('--font-size-sub', `${d.fontSizeSub} px`);
+    root.style.setProperty('--font-size-main', `${d.fontSizeMain}px`);
+    root.style.setProperty('--font-size-sub', `${d.fontSizeSub}px`);
     root.style.setProperty('--font-family-main', d.fontFamilyMain || "'Inter', 'Segoe UI', system-ui, sans-serif");
     root.style.setProperty('--font-family-sub', d.fontFamilySub || "'Inter', 'Segoe UI', system-ui, sans-serif");
     (document.body.style as any).zoom = String(d.zoom);
@@ -185,27 +185,27 @@ function AppInner() {
 
         {/* Navigation Items */}
         <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%' }}>
-          <NavLink to="/data" onClick={(e) => handleNavClick(e, '/data')} className={({ isActive }) => `nav - link ${isActive ? 'active' : ''} ${collapsed ? 'collapsed' : ''} `} title={t('TAB_DATA', 'データ管理')}>
+          <NavLink to="/data" onClick={(e) => handleNavClick(e, '/data')} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''} ${collapsed ? 'collapsed' : ''}`} title={t('TAB_DATA', 'データ管理')}>
             <Database size={22} style={{ flexShrink: 0 }} />
             <span className="nav-text">{t('TAB_DATA', 'データ管理')}</span>
           </NavLink>
-          <NavLink to="/list" onClick={(e) => handleNavClick(e, '/list')} className={({ isActive }) => `nav - link ${isActive ? 'active' : ''} ${collapsed ? 'collapsed' : ''} `} title={t('TAB_LIST', '所持AFリスト')}>
+          <NavLink to="/list" onClick={(e) => handleNavClick(e, '/list')} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''} ${collapsed ? 'collapsed' : ''}`} title={t('TAB_LIST', '所持AFリスト')}>
             <List size={22} style={{ flexShrink: 0 }} />
             <span className="nav-text">{t('TAB_LIST', '所持AFリスト')}</span>
           </NavLink>
-          <NavLink to="/grid" onClick={(e) => handleNavClick(e, '/grid')} className={({ isActive }) => `nav - link ${isActive ? 'active' : ''} ${collapsed ? 'collapsed' : ''} `} title={t('TAB_GRID', 'ゲーム内UI')}>
+          <NavLink to="/grid" onClick={(e) => handleNavClick(e, '/grid')} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''} ${collapsed ? 'collapsed' : ''}`} title={t('TAB_GRID', 'ゲーム内UI')}>
             <Grid size={22} style={{ flexShrink: 0 }} />
             <span className="nav-text">{t('TAB_GRID', 'ゲーム内UI')}</span>
           </NavLink>
-          <NavLink to="/criteria" onClick={(e) => handleNavClick(e, '/criteria')} className={({ isActive }) => `nav - link ${isActive ? 'active' : ''} ${collapsed ? 'collapsed' : ''} `} title={t('TAB_CRITERIA', '確保AF条件')}>
+          <NavLink to="/criteria" onClick={(e) => handleNavClick(e, '/criteria')} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''} ${collapsed ? 'collapsed' : ''}`} title={t('TAB_CRITERIA', '確保AF条件')}>
             <Filter size={22} style={{ flexShrink: 0 }} />
             <span className="nav-text">{t('TAB_CRITERIA', '確保AF条件')}</span>
           </NavLink>
-          <NavLink to="/settings" onClick={(e) => handleNavClick(e, '/settings')} className={({ isActive }) => `nav - link ${isActive ? 'active' : ''} ${collapsed ? 'collapsed' : ''} `} title={t('TAB_SETTINGS', '設定')}>
+          <NavLink to="/settings" onClick={(e) => handleNavClick(e, '/settings')} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''} ${collapsed ? 'collapsed' : ''}`} title={t('TAB_SETTINGS', '設定')}>
             <SettingsIcon size={22} style={{ flexShrink: 0 }} />
             <span className="nav-text">{t('TAB_SETTINGS', '設定')}</span>
           </NavLink>
-          <NavLink to="/help" onClick={(e) => handleNavClick(e, '/help')} className={({ isActive }) => `nav - link ${isActive ? 'active' : ''} ${collapsed ? 'collapsed' : ''} `} title={language === 'en' ? 'How to use' : '使い方'}>
+          <NavLink to="/help" onClick={(e) => handleNavClick(e, '/help')} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''} ${collapsed ? 'collapsed' : ''}`} title={language === 'en' ? 'How to use' : '使い方'}>
             <BookOpen size={22} style={{ flexShrink: 0 }} />
             <span className="nav-text">{language === 'en' ? 'How to use' : '使い方'}</span>
           </NavLink>
@@ -281,4 +281,3 @@ function App() {
 }
 
 export default App;
-
