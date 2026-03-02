@@ -1,0 +1,90 @@
+日本語	English
+アーティファクト	Artifacts
+火	Fire
+水	Water
+土	Earth
+風	Wind
+光	Light
+闇	Dark
+剣	Sabre
+短剣	Dagger
+槍	Spear
+斧	Axe
+杖	Staff
+銃	Gun
+格闘	Melee
+弓	Bow
+楽器	Harp
+刀	Katana
+	
+攻撃力	ATX
+HP	HP
+クリティカル確率	Critical Hit Rate
+奥義ダメージ	C.A. DMG
+アビリティダメージ	Skill DMG
+弱体成功率	Debuff Success Rate
+ダブルアタック確率	Double Attack Rate
+トリプルアタック確率	Triple Attack Rate
+防御力	DEF
+弱体耐性	Debuff Resistance
+回避率	Dodge Rate
+回復性能	Healing
+自属性攻撃力	Elemental ATK
+有利属性軽減	Superior Element Reduction
+	
+通常攻撃ダメージ上限	N.A. DMG Cap
+アビリティダメージ上限	Skill DMG Cap
+奥義ダメージ上限	C.A. DMG Cap
+通常攻撃の与ダメージ上昇	Supplemental N.A. DMG
+アビリティ与ダメージ上昇	Supplemental Skill DMG
+奥義与ダメージ上昇	Supplemental C.A. DMG
+奥義ダメージ特殊上限UP	Special C.A. DMG Cap
+チェイン与ダメージUP	Chain DMG Amplify
+ターンダメージを軽減	Turn-Based DMG Reduction
+再生	Regeneration
+HPが100%の時、与ダメージUP	Amplify DMG at 100% HP by 
+HPが50%以上の時、トリプルアタック確率UP	Boost triple attack rate when at or above 50% HP by 
+HPが50%以下の時、被ダメージを軽減	DMG reduction when at or below 50% HP: 
+クリティカル発動時、ダメージ上限UP	Boost DMG cap for critical hits by 
+最大HP上昇/防御力-70%	Max HP boost for a 70% hit to DEF: 
+通常攻撃ダメージ上限UP/アビリティダメージ上限-80％/奥義ダメージ上限-60％	N.A. DMG cap boost for an 80%/60% hit to skill/C.A. DMG cap: 
+アビリティダメージ上限UP/通常攻撃ダメージ上限-20％/奥義ダメージ上限-60％	Skill DMG cap boost for a 20%/60% hit to N.A./C.A. DMG cap: 
+奥義ダメージ上限UP/通常攻撃ダメージ上限-20％/アビリティダメージ上限-80％	C.A. DMG cap boost for a 20%/80% hit to N.A./skill DMG cap:  
+確率で強化効果が無効化されない	Chance to cancel incoming dispels: 
+確率で攻撃開始時に自分の弱体効果を1つ回復	Chance to remove 1 debuff before attacking: 
+	
+弱体アビリティ使用時、敵に被ダメージUP(2回)	Upon using a debuff skill: Amplify foe's DMG taken (2 hits) by 
+回復アビリティ使用時、自分の次に配置されたキャラに自属性追撃効果(1回)	Upon using a healing skill: Ally in the next position gains a 1-time Bonus Elemental DMG effect of 
+リンクアビリティを一定回数使用時に自分のリンクアビリティの再使用間隔を1ターン短縮	Cut linked skill cooldowns by 1 turn after using a linked skill 
+使用間隔が10ターン以上のアビリティ使用時、自分に与ダメージUP	After using a skill with a cooldown of 10 or more turns: Amplify DMG by 
+アビリティを一定回数使用する度に自分にダメージ上限UP(累積)	Boost to DMG cap (Stackable) after using skills 
+アビリティダメージを一定量与える毎に自分にアビリティ与ダメージ上昇(累積)	Supplement skill DMG (Stackable) after dealing this amount of skill DMG: 
+1回攻撃発動時、自分に一定個数ランダムな強化効果	Upon single attacks: Gain 
+ターン終了時、自分がそのターン中に消費したHPに応じて敵に無属性ダメージ	Plain DMG to a foe at end of turn based on how much HP the equipper lost that turn: 
+ターン終了時、自分がそのターン中に消費した奥義ゲージ量に応じて自分に与ダメージ上昇	Gain supplemental DMG at end of turn based on amount of charge bar spent that turn: 
+攻撃開始時に敵の弱体効果の数が3つ以下の時、自分にブロック効果	When a foe has 3 or fewer debuffs at turn start: Equipper gains an Armor effect with a strength of 
+ターン終了時にHPが50%以下の敵がいる時、一度だけ自分のHPを回復	When a foe's HP is at 50% or lower at end of turn (1 time): Restore equipper's HP by 
+サブメンバー時、一定ターン毎に敵全体にランダムな弱体効果を1つ付与(重複不可)	When a sub ally (Max 1 of this skill per party): 1 random debuff to all foes every 
+一定回数敵の攻撃行動のターゲットになった場合、一度だけ自分に自属性追撃(1回)効果	Gain a Bonus Elemental DMG effect (1 time) after being targeted by foes' attacks 
+攻撃行動を行わなかった場合、ターン終了時に自分に一定個数ランダムな強化効果	At end of turn if equipper didn't attack: Gain 
+キュアポーションまたはオールポーション使用時にフェイタルチェインゲージUP(重複不可)	Upon using a green or blue potion (Max 1 of this skill per party): Boost Fated Chain bar by 
+敵に一定回数攻撃を与えた時、一度だけ自分に乱撃(3ヒット)効果(1回)	Gain a 3-hit Flurry effect (1 time) after hitting a foe 
+戦闘不能になった時、一度だけ味方全体に一定個数ランダムな強化効果	When knocked out (1 time): All allies gain  
+バトル登場時に一度だけ自分の与ダメージUP	When switching to a main ally (1 time): Amplify DMG by 
+バトル開始時に自分に一定個数ランダムな強化効果	At battle start: Gain 
+バトル開始時から1ターンの間被ダメージ減少	At battle start: Mitigate DMG taken for 1 turn by 
+バトル開始時と5ターン毎に自分にバリア効果	At battle start and every 5 turns: Gain a Shield effect with a value of 
+バトル開始時に最大HPの20%を消費するが3ターン後、自分にダメージ上限UP	Start battle with 20% of HP consumed / After 3 turns: DMG cap is boosted by 
+1番目のアビリティ使用時にHPを一定割合消費するが、1番目のアビリティの使用間隔を1ターン短縮(レベルに応じて消費割合DOWN)	Upon casting first-slot skill: Cut first-slot skill's cooldown by 1 turn and consume this percentage of current HP (HP consumption lowers with higher lvls of this artifact skill): 
+攻撃開始時、確率で自分に乱撃(6ヒット)効果(1回)	Chance to gain a 6-hit Flurry effect (1 time) before attacking: 
+確率でターンの進行時に経過ターンを5ターン進める(重複不可)	Chance of battle turn progressing by 5 at end of turn (Max 1 of this skill per party): 
+ターン終了時、確率で敵の強化効果を全て無効化(重複不可)	Chance to remove all buffs from a foe at end of turn:
+バトル終了時にランダムな耳飾りを入手することがある(レベルに応じて入手確率UP/重複不可)　◆サブメンバーにいる場合でも発動	Boost item drop rate (Even when a sub ally / Max 1 of this skill per party) by 
+アイテムドロップ率UP(重複不可)　◆サブメンバーにいる場合でも発動	Boost EXP earned (Even when a sub ally / Max 1 of this skill per party) by
+獲得経験値UP(重複不可)　◆サブメンバーにいる場合でも発動	May find a random pair of earrings at end of battle (Even when a sub ally / Max 1 of this skill per party / Chance increases with skill lvl)
+	
+幻麗の犀牙	Fantosmik Fengtooth
+幻麗の小槌	Fantosmik Maylet
+幻麗の玉石	Fantosmik Gemme
+幻麗の明鉱	Fantosmik Lanterne
+幻麗の紋章	Fantosmik Creste

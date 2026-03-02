@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>AF Collector</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      width: 340px;
+      min-height: 220px;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 14px;
+      background: #0f111a;
+      color: #e2e8f0;
+      padding: 1.2rem;
+    }
+
+    h1 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: #d4af37;
+    }
+
+    h1 .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #3b82f6;
+      transition: background 0.3s;
+    }
+
+    h1 .dot.active {
+      background: #10b981;
+      animation: pulse 1.2s infinite;
+    }
+
+    h1 .dot.done {
+      background: #10b981;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.3;
+      }
+    }
+
+    .status-box {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 0.9rem 1rem;
+      margin-bottom: 0.9rem;
+      font-size: 0.92rem;
+      line-height: 1.6;
+    }
+
+    .progress-bar-wrap {
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 4px;
+      height: 8px;
+      margin-top: 0.5rem;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      height: 100%;
+      border-radius: 4px;
+      background: linear-gradient(90deg, #3b82f6, #10b981);
+      transition: width 0.3s;
+    }
+
+    .pages-label {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #60a5fa;
+      margin-top: 0.4rem;
+    }
+
+    .pages-missing {
+      font-size: 0.82rem;
+      color: #f59e0b;
+      margin-top: 0.3rem;
+      word-break: break-all;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    button {
+      flex: 1;
+      padding: 0.55rem 0.9rem;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-size: 0.92rem;
+      font-weight: 600;
+      transition: opacity 0.15s;
+    }
+
+    button:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    .btn-start {
+      background: #3b82f6;
+      color: #fff;
+    }
+
+    .btn-stop {
+      background: rgba(239, 68, 68, 0.8);
+      color: #fff;
+    }
+
+    .btn-dl {
+      background: #10b981;
+      color: #fff;
+    }
+
+    .btn-reset {
+      background: rgba(255, 255, 255, 0.08);
+      color: #94a3b8;
+    }
+
+    .btn-send {
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      color: #fff;
+      width: 100%;
+    }
+
+    .btn-gbf {
+      background: rgba(212, 175, 55, 0.15);
+      color: #d4af37;
+      border: 1px solid rgba(212, 175, 55, 0.3);
+      width: 100%;
+      font-size: 0.82rem;
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.6rem;
+      font-size: 0.85rem;
+      color: #94a3b8;
+    }
+
+    .toggle-row input[type=checkbox] {
+      width: 15px;
+      height: 15px;
+      cursor: pointer;
+      flex-shrink: 0;
+      accent-color: #10b981;
+    }
+
+    .complete-banner {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      border-radius: 8px;
+      padding: 0.7rem 1rem;
+      font-size: 0.9rem;
+      color: #10b981;
+      margin-bottom: 0.9rem;
+      text-align: center;
+      font-weight: 600;
+      line-height: 1.5;
+    }
+
+    .hint {
+      font-size: 0.82rem;
+      color: #64748b;
+      margin-top: 0.9rem;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+
+<body>
+  <h1><span class="dot" id="dot"></span> AF Collector</h1>
+
+  <div class="status-box" id="statusBox">
+    <div id="statusText" data-i18n="statusWaiting">待機中 — 収集開始ボタンを押してください</div>
+    <div class="progress-bar-wrap" id="progressWrap" style="display:none">
+      <div class="progress-bar" id="progressBar" style="width:0%"></div>
+    </div>
+    <div class="pages-label" id="pagesLabel"></div>
+    <div class="pages-missing" id="pagesMissing"></div>
+  </div>
+
+  <div class="complete-banner" id="completeBanner" style="display:none" data-i18n="bannerComplete">
+    ✅ 全ページ取得完了！下のボタンで送信してください。
+  </div>
+
+  <div class="btn-row" style="margin-bottom:0.6rem">
+    <button class="btn-gbf" id="btnGbf" data-i18n="btnGbf">🎮 AF一覧を開く</button>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn-start" id="btnStart" data-i18n="btnStart">▶ 収集開始</button>
+    <button class="btn-stop" id="btnStop" style="display:none" data-i18n="btnStop">■ 停止</button>
+    <button class="btn-dl" id="btnDl" style="display:none" data-i18n="btnDl">⬇ ダウンロード</button>
+    <button class="btn-reset" id="btnReset" data-i18n="btnReset">↺ リセット</button>
+  </div>
+  <div class="toggle-row">
+    <input type="checkbox" id="chkAutoDl" checked />
+    <label for="chkAutoDl" data-i18n="chkAutoDl">完了時に自動DL</label>
+  </div>
+  <div class="btn-row" style="margin-top:0.5rem">
+    <button class="btn-send" id="btnSend" style="display:none" data-i18n="btnSend">➡️ AF Managerへ直接送信</button>
+  </div>
+  <div id="sendStatus" style="font-size:0.82rem;margin-top:0.4rem;min-height:1.2em"></div>
+  <div style="font-size:0.72rem;color:#475569;margin-top:0.2rem;" data-i18n="noteDirectSend">※直接送信は同一ブラウザで開いた AF Manager のみ対応</div>
+
+  <div class="hint" id="hint" data-i18n="hintDefault">
+    ゲームのAFリスト画面を開き、ページを送ることでデータが収集されます。
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+
+</html>

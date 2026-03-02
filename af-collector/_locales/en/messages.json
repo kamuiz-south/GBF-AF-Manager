@@ -1,0 +1,98 @@
+{
+    "extName": {
+        "message": "AF Collector",
+        "description": "Name of the extension"
+    },
+    "extDesc": {
+        "message": "Granblue Fantasy Artifact Data Auto Collection Tool",
+        "description": "Description of the extension"
+    },
+    "statusWaiting": {
+        "message": "Waiting - Please click Start Collection",
+        "description": "Status message when waiting to start"
+    },
+    "statusCollecting": {
+        "message": "Collecting (Move through the AF list pages)",
+        "description": "Status message while collecting"
+    },
+    "statusStopped": {
+        "message": "Stopped",
+        "description": "Status message when stopped"
+    },
+    "statusComplete": {
+        "message": "Collection Complete",
+        "description": "Status message when complete"
+    },
+    "bannerComplete": {
+        "message": "✅ All pages collected! Send via the button below.",
+        "description": "Banner message when all pages are collected"
+    },
+    "btnGbf": {
+        "message": "🎮 Open AF List",
+        "description": "Button to open Granblue Fantasy Artifact List"
+    },
+    "btnStart": {
+        "message": "▶ Start Collection",
+        "description": "Button to start collection"
+    },
+    "btnStop": {
+        "message": "■ Stop",
+        "description": "Button to stop collection"
+    },
+    "btnDl": {
+        "message": "⬇ Download",
+        "description": "Button to download JSON"
+    },
+    "btnReset": {
+        "message": "↺ Reset",
+        "description": "Button to clear collected data"
+    },
+    "chkAutoDl": {
+        "message": "Auto DL when finish",
+        "description": "Checkbox label for auto download"
+    },
+    "btnSend": {
+        "message": "➡️ Send to AF Manager directly",
+        "description": "Button to send data to AF Manager"
+    },
+    "noteDirectSend": {
+        "message": "*Direct send only works with AF Manager opened in the same browser.",
+        "description": "Note regarding direct sending"
+    },
+    "hintDefault": {
+        "message": "Open the game's AF list screen and turn pages to collect data.",
+        "description": "Default hint text at the bottom"
+    },
+    "pagesMissing": {
+        "message": "Missing Pages: $1",
+        "description": "Text showing missing pages"
+    },
+    "sendSuccess": {
+        "message": "✅ Successfully sent to AF Manager",
+        "description": "Message shown when sending data succeeds"
+    },
+    "sendFailed": {
+        "message": "❌ Failed to send. Is AF Manager Tab opened?",
+        "description": "Message shown when sending data fails"
+    },
+    "sendRetry": {
+        "message": "Retrying $1...",
+        "description": "Message when sending is retrying"
+    },
+    "sendNoData": {
+        "message": "⚠️ No data to send. Please collect first.",
+        "description": "Message when starting to send but no data exists."
+    },
+    "filterWarnTitle": {
+        "message": "A filter was detected.",
+        "description": "Title of the filter warning banner"
+    },
+    "filterWarnDesc": {
+        "message": "Collection is continuing. To collect all AFs, clear the filter in-game, click reset, and collect again.",
+        "description": "Description of the filter warning banner"
+    },
+    "confirmReset": {
+        "message": "Reset collected data?",
+        "description": "Confirmation dialog when resetting data"
+    }
+}

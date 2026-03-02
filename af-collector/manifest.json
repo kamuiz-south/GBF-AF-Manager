@@ -1,0 +1,65 @@
+{
+  "manifest_version": 3,
+  "name": "__MSG_extName__",
+  "version": "0.2.0",
+  "description": "__MSG_extDesc__",
+  "default_locale": "ja",
+  "icons": {
+    "32": "icons/icon_32.png",
+    "128": "icons/icon_128.png"
+  },
+  "permissions": [
+    "storage",
+    "downloads",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://game.granbluefantasy.jp/*",
+    "http://localhost:*/*",
+    "http://127.0.0.1:*/*",
+    "https://*.github.io/*"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "page_world.js"
+      ],
+      "matches": [
+        "https://game.granbluefantasy.jp/*"
+      ]
+    }
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://game.granbluefantasy.jp/*"
+      ],
+      "js": [
+        "content_script.js"
+      ],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "http://localhost:*/*",
+        "http://127.0.0.1:*/*",
+        "https://*.github.io/*"
+      ],
+      "js": [
+        "af_receiver.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "AF Collector",
+    "default_icon": {
+      "32": "icons/icon_32.png",
+      "128": "icons/icon_128.png"
+    }
+  }
+}

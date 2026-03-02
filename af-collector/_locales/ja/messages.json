@@ -1,0 +1,98 @@
+{
+    "extName": {
+        "message": "AF Collector",
+        "description": "Name of the extension"
+    },
+    "extDesc": {
+        "message": "Granblue Fantasy アーティファクトデータ自動収集ツール",
+        "description": "Description of the extension"
+    },
+    "statusWaiting": {
+        "message": "待機中 — 収集開始ボタンを押してください",
+        "description": "Status message when waiting to start"
+    },
+    "statusCollecting": {
+        "message": "収集中 (AFリストのページを送ってください)",
+        "description": "Status message while collecting"
+    },
+    "statusStopped": {
+        "message": "停止",
+        "description": "Status message when stopped"
+    },
+    "statusComplete": {
+        "message": "収集完了",
+        "description": "Status message when complete"
+    },
+    "bannerComplete": {
+        "message": "✅ 全ページ取得完了！下のボタンで送信してください。",
+        "description": "Banner message when all pages are collected"
+    },
+    "btnGbf": {
+        "message": "🎮 AF一覧を開く",
+        "description": "Button to open Granblue Fantasy Artifact List"
+    },
+    "btnStart": {
+        "message": "▶ 収集開始",
+        "description": "Button to start collection"
+    },
+    "btnStop": {
+        "message": "■ 停止",
+        "description": "Button to stop collection"
+    },
+    "btnDl": {
+        "message": "⬇ ダウンロード",
+        "description": "Button to download JSON"
+    },
+    "btnReset": {
+        "message": "↺ リセット",
+        "description": "Button to clear collected data"
+    },
+    "chkAutoDl": {
+        "message": "完了時に自動DL",
+        "description": "Checkbox label for auto download"
+    },
+    "btnSend": {
+        "message": "➡️ AF Managerへ直接送信",
+        "description": "Button to send data to AF Manager"
+    },
+    "noteDirectSend": {
+        "message": "※直接送信は同一ブラウザで開いた AF Manager のみ対応",
+        "description": "Note regarding direct sending"
+    },
+    "hintDefault": {
+        "message": "ゲームのAFリスト画面を開き、ページを送ることでデータが収集されます。",
+        "description": "Default hint text at the bottom"
+    },
+    "pagesMissing": {
+        "message": "未取得ページ: $1",
+        "description": "Text showing missing pages"
+    },
+    "sendSuccess": {
+        "message": "✅ AF Managerへの送信に成功しました",
+        "description": "Message shown when sending data succeeds"
+    },
+    "sendFailed": {
+        "message": "❌ 送信失敗。AF Managerタブは開かれていますか？",
+        "description": "Message shown when sending data fails"
+    },
+    "sendRetry": {
+        "message": "再送中($1)...",
+        "description": "Message when sending is retrying"
+    },
+    "sendNoData": {
+        "message": "⚠️ 送信するデータがありません。先に収集を行ってください。",
+        "description": "Message when starting to send but no data exists."
+    },
+    "filterWarnTitle": {
+        "message": "フィルターが検出されました。",
+        "description": "Title of the filter warning banner"
+    },
+    "filterWarnDesc": {
+        "message": "収集は継続中です。全AF取得にはフィルターを解除し、リセット後に再収集してください。",
+        "description": "Description of the filter warning banner"
+    },
+    "confirmReset": {
+        "message": "収集データをリセットしますか？",
+        "description": "Confirmation dialog when resetting data"
+    }
+}

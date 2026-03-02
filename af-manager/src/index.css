@@ -1,0 +1,344 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --bg-color: #0c0e12;
+  --bg-gradient: radial-gradient(circle at 10% 20%, rgba(30, 58, 138, 0.15) 0%, transparent 40%),
+    radial-gradient(circle at 90% 80%, rgba(124, 58, 237, 0.12) 0%, transparent 40%);
+  --panel-bg: rgba(20, 24, 34, 0.65);
+  --panel-bg-hover: rgba(30, 36, 50, 0.7);
+  --panel-border: rgba(255, 255, 255, 0.06);
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --accent-blue: #3b82f6;
+  --accent-blue-hover: #60a5fa;
+  --accent-gold: #fbbf24;
+  --accent-purple: #8b5cf6;
+  --accent-danger: #ef4444;
+  --accent-success: #10b981;
+  /* Font families are now set dynamically in App.tsx via --font-family-main and --font-family-sub */
+  --glass-blur: blur(16px);
+  --focus-ring: 0 0 0 2px rgba(59, 130, 246, 0.5);
+  /* User-configurable font sizes */
+  --font-size-main: 14px;
+  --font-size-sub: 12px;
+  /* Component backgrounds */
+  --grid-item-bg: rgba(255, 255, 255, 0.03);
+  --grid-item-rare-bg: #29242F;
+  --grid-item-rare-border: #5E4150;
+  --grid-item-selected-bg: rgba(0, 0, 0, 0.4);
+  --criteria-card-bg: rgba(255, 255, 255, 0.02);
+  --criteria-detail-bg: rgba(0, 0, 0, 0.2);
+  --dim-bg: rgba(255, 255, 255, 0.05);
+  --dim-border: rgba(255, 255, 255, 0.1);
+  --weapon-text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+  --criteria-new-bg: rgba(0, 0, 0, 0.3);
+  --skill-name-color: #fff;
+}
+
+/* ── Light theme ───────────────────────────────── */
+.theme-light {
+  --bg-color: #f8fafc;
+  --bg-gradient: radial-gradient(circle at 10% 20%, rgba(59, 130, 246, 0.08) 0%, transparent 40%),
+    radial-gradient(circle at 90% 80%, rgba(139, 92, 246, 0.07) 0%, transparent 40%);
+  --panel-bg: rgba(255, 255, 255, 0.85);
+  --panel-bg-hover: rgba(248, 250, 252, 0.95);
+  --panel-border: rgba(15, 23, 42, 0.12);
+  --text-main: #0f172a;
+  --text-muted: #475569;
+  --accent-blue: #2563eb;
+  --accent-blue-hover: #1d4ed8;
+  --accent-gold: #d97706;
+  /* Darker amber for readability on white */
+  --accent-purple: #7c3aed;
+  /* Darker purple */
+  --accent-danger: #dc2626;
+  /* Darker red */
+  --accent-success: #059669;
+  /* Darker green */
+  --glass-blur: blur(16px);
+  --focus-ring: 0 0 0 2px rgba(37, 99, 235, 0.4);
+  --dim-bg: rgba(0, 0, 0, 0.04);
+  --dim-border: rgba(0, 0, 0, 0.1);
+  --criteria-detail-bg: rgba(0, 0, 0, 0.04);
+  --grid-item-bg: rgba(0, 0, 0, 0.06);
+  --grid-item-rare-bg: rgba(244, 114, 182, 0.12);
+  --grid-item-rare-border: rgba(244, 114, 182, 0.6);
+  --grid-item-selected-bg: #ffffff;
+  --weapon-text-shadow: none;
+  --criteria-new-bg: #ffffff;
+  --skill-name-color: #000000;
+}
+
+.theme-light body,
+.theme-light .app-container {
+  background-color: var(--bg-color);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-family-main);
+  font-size: var(--font-size-main);
+  background-color: var(--bg-color);
+  background-image: var(--bg-gradient);
+  color: var(--text-main);
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Layout Utilities */
+.app-container {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.sidebar {
+  width: 260px;
+  background: rgba(15, 17, 26, 0.8);
+  backdrop-filter: var(--glass-blur);
+  border-right: 1px solid var(--panel-border);
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem 1rem;
+  z-index: 10;
+}
+
+.main-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 2rem;
+  position: relative;
+}
+
+/* Glassmorphism Panel */
+.glass-panel {
+  background: var(--panel-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--panel-border);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px -4px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Typography */
+h1,
+h2,
+h3,
+h4,
+h5 {
+  color: var(--text-main);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
+  font-weight: 500;
+  font-size: var(--font-size-main);
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid transparent;
+  outline: none;
+  user-select: none;
+}
+
+.btn:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent-blue), #2563eb);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, var(--accent-blue-hover), var(--accent-blue));
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.5);
+  transform: translateY(-1px);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-main);
+}
+
+.btn-danger {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--accent-danger);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.btn-danger:hover {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+/* Inputs and Forms */
+.input {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 0.6rem 1rem;
+  color: var(--text-main);
+  font-family: inherit;
+  font-size: var(--font-size-main);
+  transition: all 0.2s;
+}
+
+/* Remove arrows from number inputs using the no-spinner class */
+.no-spinner::-webkit-outer-spin-button,
+.no-spinner::-webkit-inner-spin-button {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  margin: 0 !important;
+}
+
+.no-spinner[type="number"] {
+  -moz-appearance: textfield !important;
+  appearance: textfield !important;
+}
+
+/* Hover-only action buttons for Criteria Grid */
+.hover-action-btn {
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  transition: all 0.2s ease;
+  color: var(--text-main);
+}
+
+.hover-action-btn:hover {
+  background: var(--dim-bg) !important;
+  border-color: var(--panel-border) !important;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.input::placeholder {
+  color: rgba(255, 255, 255, 0.2);
+}
+
+select.input option {
+  background-color: #ffffff;
+  color: #000000;
+}
+
+/* Navigation Links */
+.nav-link {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 11px;
+  color: var(--text-muted);
+  text-decoration: none;
+  border-radius: 8px;
+  margin-bottom: 0.2rem;
+  transition: all 0.2s;
+  font-weight: 500;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.nav-link:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.nav-link.active {
+  color: var(--accent-gold);
+  background: rgba(251, 191, 36, 0.15);
+}
+
+.nav-link.collapsed {
+  justify-content: flex-start;
+}
+
+.nav-text {
+  margin-left: 0.75rem;
+  transition: opacity 0.15s ease, width 0.2s ease, margin-left 0.2s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  opacity: 1;
+}
+
+.nav-link.collapsed .nav-text {
+  opacity: 0;
+  width: 0;
+  margin-left: 0;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Extra overrides for better light theme contrast */
+.theme-light .input {
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.theme-light .input:focus {
+  background: #ffffff;
+}
+
+.theme-light .input::placeholder {
+  color: rgba(15, 23, 42, 0.4);
+}
+
+.theme-light .sidebar {
+  background: rgba(248, 250, 252, 0.85);
+}
+
+.theme-light ::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.2);
+}
+
+.theme-light ::-webkit-scrollbar-thumb:hover {
+  background: rgba(15, 23, 42, 0.3);
+}
+
+/* Automatically apply the sub font to any element that uses the sub font size */
+[style*="--font-size-sub"] {
+  font-family: var(--font-family-sub);
+}
