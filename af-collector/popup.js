@@ -135,7 +135,6 @@ function showFilterWarning() {
             ${chrome.i18n.getMessage('filterWarnTitle')}<br>
             <span style="color:#94a3b8;font-size:0.78rem">${chrome.i18n.getMessage('filterWarnDesc')}</span>
         </span>
-        <button onclick="this.parentElement.remove()" style="margin-left:auto;background:none;border:none;color:#64748b;cursor:pointer;font-size:1rem;padding:0;flex-shrink:0">✕</button>
     `;
 
     document.getElementById('statusBox').before(banner);

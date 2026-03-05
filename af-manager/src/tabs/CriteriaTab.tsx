@@ -443,6 +443,12 @@ export default function CriteriaTab() {
                                                 }
                                                 setSkills({ ...skills, [k]: val });
                                             }}
+                                            onBlur={(e) => {
+                                                if (e.target.value.trim() === '') {
+                                                    setSkillPriorities(prev => ({ ...prev, [k]: null }));
+                                                    setSkillMustMatch(prev => ({ ...prev, [k]: false }));
+                                                }
+                                            }}
                                             style={{ flex: 1 }}
                                         />
                                         <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', minWidth: '90px' }}>
