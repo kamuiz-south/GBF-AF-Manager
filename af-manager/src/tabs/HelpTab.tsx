@@ -48,7 +48,7 @@ export default function HelpTab() {
                         <Step n={1}>{language === 'en' ? 'Open Granblue Fantasy in your browser and go to the Artifact List screen.' : 'グランブルーファンタジーをブラウザで開き、アーティファクト一覧画面へ移動する'}</Step>
                         <Step n={2}>{language === 'en' ? 'Click the "Start Collection" button in AF Collector and manually navigate through all pages of the AF list.' : 'AF Collectorの「収集開始」ボタンを押し、手動でAFリストを全ページ移動する'}</Step>
                         <Step n={3}>{language === 'en' ? 'After collection is complete, click the send button in AF Collector.' : '収集完了後、AF Collectorの送信ボタンを押す'}</Step>
-                        <Note>{language === 'en' ? 'Cannot send to a different browser. Use the same browser or the Tauri app version.' : '別ブラウザへは送信できません。同一ブラウザかTauriアプリ版をご使用ください。'}</Note>
+                        <Note>{language === 'en' ? 'Cannot send to a different browser. Use the same browser or the Desktop App version.' : '別ブラウザへは送信できません。同一ブラウザかデスクトップアプリ版をご使用ください。'}</Note>
                     </div>
                     <div style={{ background: 'var(--dim-bg)', padding: '1rem', borderRadius: '8px', borderLeft: '3px solid var(--accent-gold)' }}>
                         <div style={{ fontWeight: 700, marginBottom: '0.4rem' }}>{language === 'en' ? '② Drag & Drop File' : '② ファイルをドラッグ＆ドロップ'}</div>
@@ -72,9 +72,11 @@ export default function HelpTab() {
                 <p style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-main)', marginBottom: '1rem', lineHeight: 1.6 }}>
                     {language === 'en' ? 'View and manage imported AF data in a list format.' : '取り込んだAFデータを一覧で確認・管理します。'}
                 </p>
-                <Step n={1}>{language === 'en' ? 'Filter the list by Element, Weapon Kind, or Keyword search.' : '属性・武器種フィルター、キーワード検索でリストを絞り込む'}</Step>
-                <Step n={2}>{language === 'en' ? 'Click any column header to sort (by evaluation score, inventory, etc.).' : '各列のヘッダーをクリックしてソート（評価スコア順、在庫順など）'}</Step>
-                <Step n={3}>{language === 'en' ? 'Each row has a memo field where you can enter personal notes (auto-saved).' : '各行にメモ欄があり、自分用のメモを入力できます（自動保存）'}</Step>
+                <ul style={{ fontSize: 'var(--font-size-main)', color: 'var(--text-muted)', lineHeight: 1.8, paddingLeft: '1.4rem', margin: 0 }}>
+                    <li><strong style={{ color: 'var(--text-main)' }}>{language === 'en' ? 'Filtering:' : '絞り込み:'}</strong> {language === 'en' ? 'Quickly find AFs using Element/Weapon Kind filters or keyword search.' : '属性や武器種フィルター、キーワード検索で目的のAFを素早く探せます。'}</li>
+                    <li><strong style={{ color: 'var(--text-main)' }}>{language === 'en' ? 'Sorting:' : 'ソート:'}</strong> {language === 'en' ? 'Click on any column header to sort the list (e.g., by Evaluation Score, alphabetical order).' : '各列のヘッダーをクリックすることで、評価スコア順や文字順等に並べ替えられます。'}</li>
+                    <li><strong style={{ color: 'var(--text-main)' }}>{language === 'en' ? 'Memo Function:' : 'メモ機能:'}</strong> {language === 'en' ? 'Enter and save personal notes on each row (changes are saved automatically).' : '各行には自分用のメモを入力・保存できます（内容は自動的に保存されます）。'}</li>
+                </ul>
                 <div style={{ marginTop: '1rem', fontSize: 'var(--font-size-main)', color: 'var(--text-muted)' }}>
                     <strong style={{ color: 'var(--text-main)' }}>{language === 'en' ? 'Status Icon Meanings:' : 'ステータスアイコンの意味：'}</strong>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem 1.5rem', marginTop: '0.4rem' }}>
@@ -186,8 +188,8 @@ export default function HelpTab() {
                         <p style={{ color: 'var(--text-muted)' }}>{language === 'en' ? 'You can alter zoom levels, select themes (Dark/Light), and adjust font sizes. Changes take effect immediately.' : 'ズーム率、テーマ（ダーク/ライト）、フォントサイズを変更できます。変更は即座に反映されます（保存ボタン不要）。'}</p>
                     </div>
                     <div>
-                        <strong style={{ color: 'var(--text-main)' }}>{language === 'en' ? 'Advanced Settings for Tauri App (Port Number)' : 'Tauriアプリ版用上級者設定（ポート番号）'}</strong>
-                        <p style={{ color: 'var(--text-muted)' }}>{language === 'en' ? 'You can change the receiving port of AF Collector for the Tauri App version. Changes require a restart.' : 'Tauriアプリ版使用時のAF Collector受信ポートを変更できます。変更後はアプリの再起動が必要です。'}</p>
+                        <strong style={{ color: 'var(--text-main)' }}>{language === 'en' ? 'Advanced Settings for Desktop App (Port Number)' : 'デスクトップアプリ版用上級者設定（ポート番号）'}</strong>
+                        <p style={{ color: 'var(--text-muted)' }}>{language === 'en' ? 'You can change the receiving port of AF Collector for the Desktop App version. Changes require a restart.' : 'デスクトップアプリ版使用時のAF Collector受信ポートを変更できます。変更後はアプリの再起動が必要です。'}</p>
                     </div>
                 </div>
             </Section>
@@ -199,7 +201,7 @@ export default function HelpTab() {
                     {[
                         {
                             q: language === 'en' ? 'My data has disappeared' : 'データが消えた',
-                            a: language === 'en' ? 'This app saves your data using the browser\'s IndexedDB (local storage). Ensure you are using the exact same browser as before. Clearing browser cache or site data will erase this data. Please periodically use "Export Data" to backup your database. This also applies to the Tauri App version.' : '本アプリはブラウザのIndexedDB（ローカルストレージ）にデータを保存しています。前回使用したブラウザと同一ブラウザか確かめてください。また、ブラウザのキャッシュ・サイトデータをクリアするとデータが消えます。定期的に「データをエクスポート」でバックアップしてください。Tauriアプリ版でも同様です。'
+                            a: language === 'en' ? 'This app saves your data using the browser\'s IndexedDB (local storage). Ensure you are using the exact same browser as before. Clearing browser cache or site data will erase this data. Please periodically use "Export Data" to backup your database. This also applies to the Desktop App version.' : '本アプリはブラウザのIndexedDB（ローカルストレージ）にデータを保存しています。前回使用したブラウザと同一ブラウザか確かめてください。また、ブラウザのキャッシュ・サイトデータをクリアするとデータが消えます。定期的に「データをエクスポート」でバックアップしてください。デスクトップアプリ版でも同様です。'
                         },
                         {
                             q: language === 'en' ? 'AF Collector cannot collect' : 'AF Collectorで収集できない',
@@ -207,7 +209,7 @@ export default function HelpTab() {
                         },
                         {
                             q: language === 'en' ? 'Extension data is not reaching the app' : '拡張機能のデータがアプリに届かない',
-                            a: language === 'en' ? 'It is only possible to send it to the GBF AF Manager tab opened within the same browser. If you don\'t want to open it in the same browser, use the Tauri App version (the app must be running to receive data).' : '同一ブラウザで開いているGBF AF Manager タブへのみ送信が可能です。同一ブラウザで開きたくない場合はTauriアプリ版をご使用ください（送信はアプリが起動中である必要があります）。'
+                            a: language === 'en' ? 'It is only possible to send it to the GBF AF Manager tab opened within the same browser. If you don\'t want to open it in the same browser, use the Desktop App version (the app must be running to receive data).' : '同一ブラウザで開いているGBF AF Manager タブへのみ送信が可能です。同一ブラウザで開きたくない場合はデスクトップアプリ版をご使用ください（送信はアプリが起動中である必要があります）。'
                         },
                         {
                             q: language === 'en' ? 'Evaluation scores are unexpected' : '評価スコアが想定と違う',

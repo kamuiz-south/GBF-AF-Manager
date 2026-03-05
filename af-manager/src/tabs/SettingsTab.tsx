@@ -359,13 +359,22 @@ export default function SettingsTab() {
                 <h3 style={{ fontSize: 'calc(var(--font-size-main) * 1.2)', marginBottom: '1.5rem', borderBottom: '1px solid var(--panel-border)', paddingBottom: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <SettingsIcon size={18} /> {language === 'en' ? 'Evaluation Formula' : '評価値の計算式'}
                 </h3>
-                <p style={{ fontSize: 'var(--font-size-main)', color: 'var(--text-muted)', marginBottom: '1.5rem', lineHeight: 1.6 }}>
-                    {language === 'en'
-                        ? <>Formula: (G1_Mult × (S1_mult × S1_Quality + S2_mult × S2_Quality)) + (G2_Mult × S3_mult × S3_Quality) + (G3_Mult × S4_mult × S4_Quality)<br />
-                            Quality is represented by the stars (1-5). S1_mult etc. are individual multipliers set below.</>
-                        : <>計算式: (G1係数 × (S1_mult × S1品質 + S2_mult × S2品質)) + (G2係数 × S3_mult × S3品質) + (G3係数 × S4_mult × S4品質)<br />
-                            ここで各スキル(S1〜S4)の品質は1〜5（星の数）となります。S1_multなどは下記で設定する個別乗算係数です。</>}
-                </p>
+                <div style={{ background: 'var(--dim-bg)', border: '1px solid var(--panel-border)', borderRadius: '8px', padding: '1rem', marginBottom: '1.5rem', fontFamily: 'monospace', fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)', lineHeight: 1.8 }}>
+                    <div style={{ fontWeight: 700, color: 'var(--text-main)', marginBottom: '0.4rem' }}>
+                        {language === 'en' ? '【 Base Skill Evaluation Value 】' : '【 基本となる各スキルの評価値 】'}
+                    </div>
+                    <div style={{ paddingLeft: '1rem', marginBottom: '1rem' }}>
+                        {language === 'en' ? '[ Skill Base Value ] = (Quality Star 1-5) × (Individual Skill Multiplier)' : '　[ スキル評価値 ] ＝ (品質の星数 1〜5) × (スキル別乗算係数)'}
+                    </div>
+                    <div style={{ fontWeight: 700, color: 'var(--text-main)', marginBottom: '0.4rem' }}>
+                        {language === 'en' ? '【 Final Overall AF Evaluation Score 】' : '【 最終的なAFの全体評価スコア 】'}
+                    </div>
+                    <div style={{ paddingLeft: '1rem' }}>
+                        <div>　( {language === 'en' ? 'G1 Multiplier' : 'G1係数'} × [ S1{language === 'en' ? 'Value' : '評価値'} + S2{language === 'en' ? 'Value' : '評価値'} ] )</div>
+                        <div>+ ( {language === 'en' ? 'G2 Multiplier' : 'G2係数'} × [ S3{language === 'en' ? 'Value' : '評価値'} ] )</div>
+                        <div>+ ( {language === 'en' ? 'G3 Multiplier' : 'G3係数'} × [ S4{language === 'en' ? 'Value' : '評価値'} ] )</div>
+                    </div>
+                </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.5rem' }}>
                     <div>
@@ -657,7 +666,7 @@ export default function SettingsTab() {
                             checked={settings.discardBehavior.protectRareAF ?? true}
                             onChange={e => updateDiscardSettings({ protectRareAF: e.target.checked })}
                         />
-                        <span><strong>{language === 'en' ? 'Protect Rare AFs' : 'レアAFを保護'}</strong><br /><span style={{ fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)' }}>{language === 'en' ? 'Excludes specific rare drops like Fantosmik Fengtooth from discard.' : '幻麗の犀牙などドロップ率が低い希少なAFを廃棄候補から除外します。'}</span></span>
+                        <span><strong>{language === 'en' ? 'Protect Quirk Artifacts' : 'クァーキー・アーティファクトを保護'}</strong><br /><span style={{ fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)' }}>{language === 'en' ? 'Excludes specific quirk artifacts like Fantosmik Fengtooth from discard.' : '幻麗の犀牙などドロップ率が希少なクァーキーAFを廃棄候補から除外します。'}</span></span>
                     </label>
                     <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.8rem', cursor: 'pointer', fontSize: 'var(--font-size-main)' }}>
                         <input type="checkbox" style={{ marginTop: '3px' }}
@@ -894,7 +903,7 @@ export default function SettingsTab() {
             {/* ── Advanced Settings (Port) ─────────────────────── */}
             <div className="glass-panel" style={{ padding: '2rem', borderColor: 'var(--dim-border)', marginBottom: '1.5rem' }}>
                 <h3 style={{ fontSize: 'calc(var(--font-size-main) * 1.2)', marginBottom: '1.5rem', borderBottom: '1px solid var(--panel-border)', paddingBottom: '0.8rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <MonitorUp size={18} /> {language === 'en' ? 'Desktop App Advanced Settings' : 'Tauriアプリ版 上級者設定'}
+                    <MonitorUp size={18} /> {language === 'en' ? 'Desktop App Advanced Settings' : 'デスクトップアプリ版 上級者設定'}
                 </h3>
 
                 <label style={{ display: 'block', fontSize: 'var(--font-size-main)', marginBottom: '0.4rem', fontWeight: 600 }}>
@@ -910,14 +919,14 @@ export default function SettingsTab() {
                     <span style={{ fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)' }}>{language === 'en' ? '(Default: 1422)' : '（デフォルト: 1422）'}</span>
                 </div>
                 <p style={{ fontSize: 'var(--font-size-sub)', color: '#f59e0b', marginBottom: '0.6rem' }}>
-                    {language === 'en' ? '⚠ Restart the Desktop Application after saving to apply port changes.' : '⚠ 変更を反映するにはアプリ設定を保存後、Tauriアプリ版を再起動してください。'}
+                    {language === 'en' ? '⚠ Restart the Desktop Application after saving to apply port changes.' : '⚠ 変更を反映するにはアプリ設定を保存後、デスクトップアプリ版を再起動してください。'}
                 </p>
                 <details style={{ fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)' }}>
                     <summary style={{ cursor: 'pointer', marginBottom: '0.4rem' }}>{language === 'en' ? '🔧 What is a port?' : '🔧 ポートとは？'}</summary>
                     <p style={{ marginTop: '0.4rem', lineHeight: 1.6 }}>
                         {language === 'en'
                             ? <>A Port is an "entryway" number through which apps communicate on your computer.<br />The GBF AF Manager Desktop App "listens" for data on this port when started,<br />and the AF Collector Chrome Extension sends data to this port.<br />Only change this if it conflicts with another application's port number.</>
-                            : <>ポート（Port）とは、コンピュータ内でアプリ同士が通信するための「窓口番号」です。<br />GBF AF Managerアプリ（Tauri版）は起動時にこの番号で通信待受を開始し、<br />ブラウザ拡張機能（AF Collector）がこの番号宛てにデータを送信します。<br />別のアプリと番号が被る（ポート競合）場合のみ変更してください。</>}
+                            : <>ポート（Port）とは、コンピュータ内でアプリ同士が通信するための「窓口番号」です。<br />GBF AF Managerアプリ（デスクトップ版）は起動時にこの番号で通信待受を開始し、<br />ブラウザ拡張機能（AF Collector）がこの番号宛てにデータを送信します。<br />別のアプリと番号が被る（ポート競合）場合のみ変更してください。</>}
                     </p>
                 </details>
             </div>

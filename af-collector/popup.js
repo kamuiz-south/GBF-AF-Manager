@@ -24,6 +24,7 @@ const btnSend = document.getElementById('btnSend');
 const btnReset = document.getElementById('btnReset');
 const btnGbf = document.getElementById('btnGbf');
 const chkAutoDl = document.getElementById('chkAutoDl');
+const autoDlRow = document.getElementById('autoDlRow');
 const sendStatus = document.getElementById('sendStatus');
 
 // ---------- UI更新 ----------
@@ -43,6 +44,8 @@ function render(p) {
         btnStart.style.display = 'none';
         btnStop.style.display = 'none';
         btnDl.style.display = '';
+        btnGbf.style.display = 'none';
+        if (autoDlRow) autoDlRow.style.display = 'none';
     } else if (collecting) {
         statusText.textContent = chrome.i18n.getMessage('statusCollecting');
         pagesLabel.textContent = total
@@ -54,6 +57,8 @@ function render(p) {
         btnStart.style.display = 'none';
         btnStop.style.display = '';
         btnDl.style.display = 'none';
+        btnGbf.style.display = 'none';
+        if (autoDlRow) autoDlRow.style.display = 'flex';
 
         // 欠けているページ
         if (total && receivedCount > 0) {
@@ -83,6 +88,8 @@ function render(p) {
         btnStart.style.display = '';
         btnStop.style.display = 'none';
         pagesMissing.textContent = '';
+        btnGbf.style.display = '';
+        if (autoDlRow) autoDlRow.style.display = 'flex';
     }
     // 小送信ボタン：完了または途中データありのとき
     btnSend.style.display = (complete || receivedCount > 0) ? '' : 'none';

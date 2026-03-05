@@ -240,6 +240,13 @@ function AppInner() {
             <Trash2 size={18} style={{ flexShrink: 0 }} /> {!collapsed && (language === 'en' ? 'Discard Flags' : '廃棄フラグ計算')}
           </button>
         </div>
+
+        {/* Version Display */}
+        {!collapsed && (
+          <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem', fontSize: '9px', color: 'var(--text-muted)', opacity: 0.7, letterSpacing: '0.05em' }}>
+            v1.0.1
+          </div>
+        )}
       </aside>
 
       <main className="main-content" ref={mainRef} onScroll={handleScroll} style={{ position: 'relative', overflowX: 'hidden' }}>

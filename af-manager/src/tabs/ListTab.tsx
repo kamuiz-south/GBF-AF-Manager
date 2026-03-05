@@ -10,6 +10,7 @@ export default function ListTab() {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterAttr, setFilterAttr] = useState('');
     const [filterKind, setFilterKind] = useState('');
+    const [filterStatus, setFilterStatus] = useState('');
     const [sortField, setSortField] = useState<keyof AppArtifact | 'inventoryOrder' | 'attr_kind' | 'memoText'>('inventoryOrder');
     const [sortAsc, setSortAsc] = useState(false);
 
@@ -38,6 +39,13 @@ export default function ListTab() {
         .filter(a =>
             (filterAttr === '' || a.attribute === filterAttr) &&
             (filterKind === '' || a.kind === filterKind) &&
+            (filterStatus === '' ||
+                (filterStatus === 'fav' && a.is_locked) ||
+                (filterStatus === 'trash' && a.is_unnecessary) ||
+                (filterStatus === 'keep' && a.keepFlag) ||
+                (filterStatus === 'discard' && a.discardFlag) ||
+                (filterStatus === 'none' && !a.is_locked && !a.is_unnecessary && !a.keepFlag && !a.discardFlag)
+            ) &&
             (
                 String(a.id).includes(searchTerm) ||
                 a.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -92,7 +100,7 @@ export default function ListTab() {
     // reset page to 1 if filter changes
     useEffect(() => {
         setCurrentPage(1);
-    }, [searchTerm, filterAttr, filterKind, sortField, sortAsc, pageSize]);
+    }, [searchTerm, filterAttr, filterKind, filterStatus, sortField, sortAsc, pageSize]);
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', height: '100%' }}>
@@ -129,6 +137,18 @@ export default function ListTab() {
                     {(['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'] as const).map(k => (
                         <option key={k} value={k}>{t(`WPN_${k}` as TranslationKey)}</option>
                     ))}
+                </select>
+
+                {/* Status filter */}
+                <select className="input" style={{ padding: '0.4rem 0.6rem', width: 'auto' }}
+                    value={filterStatus}
+                    onChange={e => { setFilterStatus(e.target.value); setCurrentPage(1); }}>
+                    <option value="">{language === 'en' ? 'Status: All' : '状態: すべて'}</option>
+                    <option value="fav">{language === 'en' ? 'Status: Fav' : '状態: お気に入り'}</option>
+                    <option value="trash">{language === 'en' ? 'Status: Trash' : '状態: 不用品'}</option>
+                    <option value="keep">{language === 'en' ? 'Status: Keep' : '状態: 確保提案'}</option>
+                    <option value="discard">{language === 'en' ? 'Status: Discard' : '状態: 廃棄提案'}</option>
+                    <option value="none">{language === 'en' ? 'Status: None' : '状態: ラベルなし'}</option>
                 </select>
 
                 <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
