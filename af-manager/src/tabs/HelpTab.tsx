@@ -215,6 +215,10 @@ export default function HelpTab() {
                             q: language === 'en' ? 'Evaluation scores are unexpected' : '評価スコアが想定と違う',
                             a: language === 'en' ? 'Check your individual skill multipliers, group coefficients, and quality level scores in the Settings tab. Pressing "Save Settings" will recalculate the score across all AFs.' : '設定タブのスキル個別乗算係数・グループ係数・品質レベル別評価値を確認してください。「設定を保存」を押すと全AFの評価値が再計算されます。'
                         },
+                        {
+                            q: language === 'en' ? 'Do my memos stay when I import new AF data?' : '新しくAFデータを取り込んでも（更新しても）メモは残るの？',
+                            a: language === 'en' ? 'Yes. Memos are stored separately from the main AF data within the app. As long as the AF (same ID) continues to exist, its associated memo will automatically persist even after re-importing data.' : 'はい。メモのテキストデータは本アプリ内で本体のAFデータとは個別に独立して保存・管理されています。新しくデータを取り込み直しても、同じAF（ID）が存在する限り自動的にメモは引き継がれて表示されます。'
+                        },
                     ].map(({ q, a }) => (
                         <details key={q} style={{ background: 'var(--dim-bg)', padding: '0.8rem 1rem', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
                             <summary style={{ cursor: 'pointer', fontWeight: 600, color: 'var(--text-main)', lineHeight: 1.5 }}>Q: {q}</summary>

@@ -5,6 +5,7 @@ import { db } from '../db';
 import { useAppStore } from '../store/useAppStore';
 import { isRareArtifact } from '../utils/evaluator';
 import { useTranslation, type TranslationKey } from '../i18n';
+import { G1_SKILLS, G2_SKILLS, G3_SKILLS } from '../data/skillMaster';
 
 const ATTR_TEXT_COLORS: Record<string, string> = {
     "1": "#ef4444", // Fire
@@ -40,6 +41,7 @@ export default function GridTab() {
 
     const [filterAttr, setFilterAttr] = useState('');
     const [filterKind, setFilterKind] = useState('');
+    const [filterSkill, setFilterSkill] = useState('');
 
     const ITEMS_PER_PAGE = 20;
     // Sort by inventory order, then apply attribute/kind filters
@@ -50,7 +52,17 @@ export default function GridTab() {
     });
     const filtered = sorted.filter(a =>
         (filterAttr === '' || a.attribute === filterAttr) &&
-        (filterKind === '' || a.kind === filterKind)
+        (filterKind === '' || a.kind === filterKind) &&
+        (filterSkill === '' || [
+            a.skill1_info?.name,
+            a.skill2_info?.name,
+            a.skill3_info?.name,
+            a.skill4_info?.name
+        ].some(name => {
+            if (!name) return false;
+            const stripped = name.split("　◆")[0].split(" ◆")[0].trim();
+            return stripped === filterSkill;
+        }))
     );
     const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
     const pageItems = filtered.slice(currentPage * ITEMS_PER_PAGE, (currentPage + 1) * ITEMS_PER_PAGE);
@@ -58,7 +70,7 @@ export default function GridTab() {
     // When filters change, snap back to page 0
     useEffect(() => {
         setCurrentPage(0);
-    }, [filterAttr, filterKind]);
+    }, [filterAttr, filterKind, filterSkill]);
 
     useEffect(() => {
         if (!selectedArtifact && pageItems.length > 0) {
@@ -165,9 +177,29 @@ export default function GridTab() {
                             <option key={k} value={k}>{t(`WPN_${k}` as TranslationKey)}</option>
                         ))}
                     </select>
-                    {(filterAttr || filterKind) && (
+                    <select className="input" style={{ padding: '0.3rem 0.5rem', width: 'auto', fontSize: 'var(--font-size-sub)', maxWidth: '140px' }}
+                        value={filterSkill}
+                        onChange={e => { setFilterSkill(e.target.value); }}>
+                        <option value="">{language === 'en' ? 'Skill: ' : 'スキル: '}{t('UI_ALL')}</option>
+                        <optgroup label={language === 'en' ? 'Group [Ⅰ]' : 'グループ 【Ⅰ】'}>
+                            {G1_SKILLS.map(s => (
+                                <option key={s.name} value={s.name}>{s.name}</option>
+                            ))}
+                        </optgroup>
+                        <optgroup label={language === 'en' ? 'Group [Ⅱ]' : 'グループ 【Ⅱ】'}>
+                            {G2_SKILLS.map(s => (
+                                <option key={s.name} value={s.name}>{s.name}</option>
+                            ))}
+                        </optgroup>
+                        <optgroup label={language === 'en' ? 'Group [Ⅲ]' : 'グループ 【Ⅲ】'}>
+                            {G3_SKILLS.map(s => (
+                                <option key={s.name} value={s.name}>{s.name}</option>
+                            ))}
+                        </optgroup>
+                    </select>
+                    {(filterAttr || filterKind || filterSkill) && (
                         <button style={{ fontSize: 'calc(var(--font-size-sub) * 0.94)', padding: '0.25rem 0.5rem', background: 'var(--dim-bg)', border: '1px solid var(--dim-border)', borderRadius: '6px', cursor: 'pointer', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}
-                            onClick={() => { setFilterAttr(''); setFilterKind(''); }}>
+                            onClick={() => { setFilterAttr(''); setFilterKind(''); setFilterSkill(''); }}>
                             {language === 'en' ? '✕ Clear' : '✕ 解除'}
                         </button>
                     )}
