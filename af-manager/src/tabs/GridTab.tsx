@@ -251,7 +251,9 @@ export default function GridTab() {
                                     transform: 'translate(-50%, -50%)',
                                     fontWeight: 900,
                                     color: ATTR_TEXT_COLORS[item.attribute] || 'rgba(255, 255, 255, 0.5)',
-                                    fontSize: language === 'en' ? 'calc(var(--font-size-main) * 1.0)' : 'calc(var(--font-size-main) * 1.4)',
+                                    fontSize: settings?.design?.gridWeaponFontSize
+                                        ? `${settings.design.gridWeaponFontSize}px`
+                                        : (language === 'en' ? 'calc(var(--font-size-main) * 1.0)' : 'calc(var(--font-size-main) * 1.4)'),
                                     textShadow: 'var(--weapon-text-shadow)'
                                 }}>
                                     {language === 'en'

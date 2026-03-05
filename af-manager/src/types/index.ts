@@ -96,6 +96,7 @@ export interface AppDesignSettings {
   fontSizeSub: number;        // secondary/muted text size in px (default 12)
   enableTabPersistence: boolean; // keep tabs mounted to retain state/scroll
   gridDetailNoMaxHeight?: boolean; // remove max-height limit on GridTab detail panel
+  gridWeaponFontSize?: number;  // font size for weapon kind text in GridTab
   fontFamilyMain?: string;
   fontFamilySub?: string;
 }
@@ -107,6 +108,7 @@ export const DEFAULT_DESIGN: AppDesignSettings = {
   theme: 'dark',
   fontSizeMain: 14,
   fontSizeSub: 12,
+  gridWeaponFontSize: 19,
   enableTabPersistence: true,
   fontFamilyMain: "'Inter', 'Segoe UI', system-ui, sans-serif",
   fontFamilySub: "'Inter', 'Segoe UI', system-ui, sans-serif",

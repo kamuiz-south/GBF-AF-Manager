@@ -857,6 +857,20 @@ export default function SettingsTab() {
                     </div>
                     <div style={{ fontSize: 'calc(var(--font-size-sub) * 0.97)', color: 'var(--text-muted)', marginTop: '0.3rem' }}>{language === 'en' ? 'Labels, ID displays, secondary info (Default: 12px)' : 'ラベル、ID表示、補足情報など（デフォルト: 12px）'}</div>
                 </div>
+                <div style={{ marginBottom: '1.5rem' }}>
+                    <label style={{ display: 'block', fontSize: 'var(--font-size-main)', marginBottom: '0.4rem', fontWeight: 600 }}>
+                        {language === 'en' ? 'Grid Weapon Text size: ' : 'ゲーム内UIタブ グリッド内武器種文字サイズ: '}<span style={{ color: 'var(--accent-blue)' }}>{currentDesign.gridWeaponFontSize ?? 19}px</span>
+                    </label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', maxWidth: '350px' }}>
+                        <button className="btn btn-ghost" onClick={() => updateDesign({ gridWeaponFontSize: Math.max(10, (currentDesign.gridWeaponFontSize ?? 19) - 1) })} style={{ padding: '0.2rem', border: '1px solid var(--panel-border)' }}><Minus size={14} /></button>
+                        <input type="range" min={10} max={40} step={1}
+                            value={currentDesign.gridWeaponFontSize ?? 19}
+                            onChange={e => updateDesign({ gridWeaponFontSize: parseInt(e.target.value) })}
+                            style={{ flex: 1 }} />
+                        <button className="btn btn-ghost" onClick={() => updateDesign({ gridWeaponFontSize: Math.min(40, (currentDesign.gridWeaponFontSize ?? 19) + 1) })} style={{ padding: '0.2rem', border: '1px solid var(--panel-border)' }}><Plus size={14} /></button>
+                    </div>
+                    <div style={{ fontSize: 'calc(var(--font-size-sub) * 0.97)', color: 'var(--text-muted)', marginTop: '0.3rem' }}>{language === 'en' ? 'Weapon Kind characters in Grid (Default: 19px)' : 'ゲーム内UIタブのカード中央に表示される武器種文字（デフォルト: 19px）'}</div>
+                </div>
 
                 <div style={{ marginBottom: '1.5rem', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--panel-border)' }}>
                     <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.7rem', cursor: 'pointer', fontSize: 'var(--font-size-main)', fontWeight: 600 }}>
