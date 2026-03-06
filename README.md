@@ -76,21 +76,8 @@
 ## ⚖️ 免責事項・ライセンス
 
 - **自己責任**: 本ツールを利用したことで発生したいかなる不利益についても、開発者は一切の責任を負いません。
-- **二次配布の禁止**: 本リポジトリのプログラムを無断で二次配布することは禁止します。
-- **アイデアの利用**: 設計や機能のアイデアは、自由にご活用ください。
-
----
-
-## 🛠️ 謝辞・利用技術 (Acknowledgments & Built With)
-
-本プロジェクトは、以下の優れたオープンソース技術の恩恵を受けて開発されています。各ライブラリの作者およびコミュニティに深く感謝いたします。
-
-- **[React](https://react.dev/)** (MIT License) - ユーザーインターフェース構築
-- **[Tauri](https://tauri.app/)** (MIT/Apache-2.0 License) - デスクトップアプリ基盤
-- **[Vite](https://vitejs.dev/)** (MIT License) - 超高速なフロントエンドビルドツール
-- **[Lucide](https://lucide.dev/)** (ISC License) - 美しく一貫性のあるアイコン群
-- **[Dexie.js](https://dexie.org/)** (Apache-2.0 License) - IndexedDBのラッパーデータベース
-- **[Zustand](https://github.com/pmndrs/zustand)** (MIT License) - 軽量で強力な状態管理
+- **License**: 本プロジェクトは [MIT License](./LICENSE) の下で公開されています。商用・非商用を問わず、自由に利用、改変、再配布が可能です。
+- **Cygames社の権利について**: 本プロジェクトには、株式会社Cygames様の権利に帰属する画像・音声等のゲーム内アセットは一切含まれていません。本ツールは非公式のユーザー制作ツールであり、公式の運営とは一切関係ありません。
 
 ---
 Developed with the power of Vibe Coding.
