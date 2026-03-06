@@ -80,4 +80,17 @@
 - **アイデアの利用**: 設計や機能のアイデアは、自由にご活用ください。
 
 ---
+
+## 🛠️ 謝辞・利用技術 (Acknowledgments & Built With)
+
+本プロジェクトは、以下の優れたオープンソース技術の恩恵を受けて開発されています。各ライブラリの作者およびコミュニティに深く感謝いたします。
+
+- **[React](https://react.dev/)** (MIT License) - ユーザーインターフェース構築
+- **[Tauri](https://tauri.app/)** (MIT/Apache-2.0 License) - デスクトップアプリ基盤
+- **[Vite](https://vitejs.dev/)** (MIT License) - 超高速なフロントエンドビルドツール
+- **[Lucide](https://lucide.dev/)** (ISC License) - 美しく一貫性のあるアイコン群
+- **[Dexie.js](https://dexie.org/)** (Apache-2.0 License) - IndexedDBのラッパーデータベース
+- **[Zustand](https://github.com/pmndrs/zustand)** (MIT License) - 軽量で強力な状態管理
+
+---
 Developed with the power of Vibe Coding.
