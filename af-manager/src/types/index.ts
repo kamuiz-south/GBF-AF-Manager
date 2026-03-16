@@ -85,8 +85,15 @@ export interface Condition {
 
   occupyKeepFlag: boolean; // if true, only flags it if it currently has no keepFlag
   memo?: string; // optional per-condition memo
+  disabled?: boolean; // if true, this condition is excluded from keep-flag calculation
 }
 
+export interface ConditionGroup {
+  id: string;      // uuid (条件の listId に対応)
+  name: string;    // ユーザーが設定するグループ名
+  color?: string;  // ラベル色（任意）
+  order: number;   // 表示順
+}
 export interface AppDesignSettings {
   zoom: number;               // global zoom (0.7–1.5, default 1.0)
   tabZoom: Record<string, number>;  // per-tab zoom overrides
@@ -144,4 +151,5 @@ export interface Settings {
   httpPort?: number;            // Tauri HTTP server port (default 1422)
   language?: 'ja' | 'en';      // UI language (default 'ja')
   pageLimit?: number;          // Stored user preference for list items per page
+  lastImportedAt?: string;     // ISO timestamp of the most recent AF data import
 }

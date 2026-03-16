@@ -46,9 +46,14 @@ export default function GridTab() {
     const ITEMS_PER_PAGE = 20;
     // Sort by inventory order, then apply attribute/kind filters
     const sorted = [...artifacts].sort((a, b) => {
-        const orderA = a.inventoryOrder ?? a.id;
-        const orderB = b.inventoryOrder ?? b.id;
-        return orderA - orderB;
+        // inventoryOrderが未定義の場合は非常に大きな値を仮置き
+        const orderA = a.inventoryOrder ?? Number.MAX_SAFE_INTEGER;
+        const orderB = b.inventoryOrder ?? Number.MAX_SAFE_INTEGER;
+        if (orderA !== orderB) {
+            return orderA - orderB;
+        }
+        // orderが同じ（または未定義同士）なら、IDの降順（新しい順）で代替ソート
+        return b.id - a.id;
     });
     const filtered = sorted.filter(a =>
         (filterAttr === '' || a.attribute === filterAttr) &&
@@ -110,6 +115,11 @@ export default function GridTab() {
                                 {selectedArtifact.discardFlag && <span style={{ fontSize: 'calc(var(--font-size-sub) * 0.87)', background: 'var(--accent-danger)', color: '#fff', padding: '2px 5px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '3px' }}><Trash2 size={13} /> {language === 'en' ? 'Discard' : '廃棄提案'}</span>}
                                 {selectedArtifact.keepFlag && <span style={{ fontSize: 'calc(var(--font-size-sub) * 0.87)', background: 'var(--accent-blue)', color: '#fff', padding: '2px 5px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '3px' }}><Star size={13} /> {language === 'en' ? 'Keep' : '確保提案'}</span>}
                                 <span style={{ fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)', marginLeft: '0.4rem' }}>ID: {selectedArtifact.id}</span>
+                                {selectedArtifact.evaluationScore !== undefined && selectedArtifact.evaluationScore !== null && (
+                                    <span style={{ fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)' }}>
+                                        {language === 'en' ? 'Eval:' : '評価:'} {selectedArtifact.evaluationScore === -1 ? '---' : selectedArtifact.evaluationScore.toFixed(2)}
+                                    </span>
+                                )}
                             </div>
                         </div>
 

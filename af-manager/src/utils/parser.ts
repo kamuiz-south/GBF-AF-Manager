@@ -61,12 +61,14 @@ export function parseArtifactData(jsonString: string, baseOrder: number = 0): Ap
         }
 
         list.forEach((item) => {
+            const anyItem = item as any;
             results.push({
                 ...item,
-                keepFlag: undefined,
-                discardFlag: false,
-                evaluationScore: 0,
-                inventoryOrder: runningOrder++,
+                keepFlag: anyItem.keepFlag ?? undefined,
+                discardFlag: anyItem.discardFlag ?? false,
+                evaluationScore: anyItem.evaluationScore ?? 0,
+                // Preserve inventoryOrder if it already exists (e.g., from backup JSON)
+                inventoryOrder: anyItem.inventoryOrder ?? runningOrder++,
             } as AppArtifact);
         });
     }

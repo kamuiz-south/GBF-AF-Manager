@@ -4,9 +4,10 @@ export async function exportDatabase() {
     const artifacts = await db.artifacts.toArray();
     const memos = await db.memos.toArray();
     const conditions = await db.conditions.toArray();
+    const groups = await db.groups?.toArray() ?? [];
     const settings = await db.settings.toArray();
 
-    const data = JSON.stringify({ artifacts, memos, conditions, settings });
+    const data = JSON.stringify({ artifacts, memos, conditions, groups, settings });
     downloadJson(data, `af_manager_backup_${today()}.json`);
 }
 
@@ -15,6 +16,7 @@ export async function importDatabase(jsonString: string) {
     if (data.artifacts) await db.artifacts.bulkPut(data.artifacts);
     if (data.memos) await db.memos.bulkPut(data.memos);
     if (data.conditions) await db.conditions.bulkPut(data.conditions);
+    if (data.groups && db.groups) await db.groups.bulkPut(data.groups);
     if (data.settings) await db.settings.bulkPut(data.settings);
 }
 
@@ -37,7 +39,8 @@ export async function importMemos(jsonString: string) {
 /** Export only the conditions table */
 export async function exportConditions() {
     const conditions = await db.conditions.toArray();
-    const data = JSON.stringify({ conditions });
+    const groups = await db.groups?.toArray() ?? [];
+    const data = JSON.stringify({ conditions, groups });
     downloadJson(data, `af_conditions_${today()}.json`);
 }
 
@@ -48,6 +51,9 @@ export async function importConditions(jsonString: string) {
         throw new Error('Conditions data not found. Please check the file. / conditions データが見つかりません。正しいファイルか確認してください。');
     }
     await db.conditions.bulkPut(data.conditions);
+    if (data.groups && Array.isArray(data.groups) && db.groups) {
+        await db.groups.bulkPut(data.groups);
+    }
 }
 
 // ---- helpers ----

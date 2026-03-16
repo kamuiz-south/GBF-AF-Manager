@@ -244,7 +244,7 @@ function AppInner() {
         {/* Version Display */}
         {!collapsed && (
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem', fontSize: '9px', color: 'var(--text-muted)', opacity: 0.7, letterSpacing: '0.05em' }}>
-            v1.0.1
+            v{import.meta.env.VITE_APP_VERSION || '1.0.3'}
           </div>
         )}
       </aside>

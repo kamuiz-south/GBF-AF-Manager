@@ -205,19 +205,15 @@ export default function HelpTab() {
                         },
                         {
                             q: language === 'en' ? 'AF Collector cannot collect' : 'AF Collectorで収集できない',
-                            a: language === 'en' ? 'Reload the page once, navigate back to the Artifact list and try collecting again. It is okay to navigate multiple pages while collecting.' : '一度リロードを行ったのち、アーティファクト一覧画面へ移動してから収集開始してみてください。収集中は同じページを横断しても問題ありません。'
+                            a: language === 'en' ? 'Reload the page once, navigate back to the Artifact list and try collecting again. It is okay to navigate multiple pages while collecting. Note: the page displayed when you press "Start Collecting" is not captured — collection begins from the next page you navigate to.' : '一度リロードを行ったのち、アーティファクト一覧画面へ移動してから収集開始してみてください。収集中は同じページを横断しても問題ありません。なお、「収集開始」を押した時点で表示されているページは取得対象になりません。ボタンを押した後に頂から順にページを送ってください。'
                         },
                         {
                             q: language === 'en' ? 'Extension data is not reaching the app' : '拡張機能のデータがアプリに届かない',
-                            a: language === 'en' ? 'It is only possible to send it to the GBF AF Manager tab opened within the same browser. If you don\'t want to open it in the same browser, use the Desktop App version (the app must be running to receive data).' : '同一ブラウザで開いているGBF AF Manager タブへのみ送信が可能です。同一ブラウザで開きたくない場合はデスクトップアプリ版をご使用ください（送信はアプリが起動中である必要があります）。'
+                            a: language === 'en' ? 'It is only possible to send data to a GBF AF Manager tab that is already open in the same browser. GBF AF Manager must be open before you press the Send button. If you don\'t want to open it in the same browser, use the Desktop App version (the app must be running when you press Send).' : '同一ブラウザで開いているGBF AF Manager タブへのみ送信が可能です。送信ボタンを押す時点で、すでにGBF AF Managerを開いた状態にしておく必要があります。同一ブラウザで開きたくない場合はデスクトップアプリ版をご使用ください（送信時はアプリ起動中である必要があります）。'
                         },
                         {
-                            q: language === 'en' ? 'Evaluation scores are unexpected' : '評価スコアが想定と違う',
-                            a: language === 'en' ? 'Check your individual skill multipliers, group coefficients, and quality level scores in the Settings tab. Pressing "Save Settings" will recalculate the score across all AFs.' : '設定タブのスキル個別乗算係数・グループ係数・品質レベル別評価値を確認してください。「設定を保存」を押すと全AFの評価値が再計算されます。'
-                        },
-                        {
-                            q: language === 'en' ? 'Do my memos stay when I import new AF data?' : '新しくAFデータを取り込んでも（更新しても）メモは残るの？',
-                            a: language === 'en' ? 'Yes. Memos are stored separately from the main AF data within the app. As long as the AF (same ID) continues to exist, its associated memo will automatically persist even after re-importing data.' : 'はい。メモのテキストデータは本アプリ内で本体のAFデータとは個別に独立して保存・管理されています。新しくデータを取り込み直しても、同じAF（ID）が存在する限り自動的にメモは引き継がれて表示されます。'
+                            q: language === 'en' ? 'Will my memos disappear if I import new AF data?' : '新しくAFデータを取り込んでも（更新しても）メモは残るの？',
+                            a: language === 'en' ? 'Yes. Memo text data is saved and managed completely separate from the main AF data. As long as the same AF (with the same ID) exists, your previous memos will automatically carry over and display even if you import new data.' : 'はい、残ります。メモのテキストデータは本アプリ内で本体のAFデータとは完全に独立して保存・管理されています。そのため、新しくデータを取り込み直しても、同じAF（ID）が存在する限りは自動的にメモが引き継がれて表示されます。'
                         },
                     ].map(({ q, a }) => (
                         <details key={q} style={{ background: 'var(--dim-bg)', padding: '0.8rem 1rem', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>

@@ -65,8 +65,14 @@ export default function ListTab() {
             }
             let valA: any = sortField === 'memoText' ? a.memoText : a[sortField as keyof AppArtifact];
             let valB: any = sortField === 'memoText' ? b.memoText : b[sortField as keyof AppArtifact];
-            if (valA === undefined) valA = 0;
-            if (valB === undefined) valB = 0;
+            if (valA === undefined) valA = sortField === 'inventoryOrder' ? Number.MAX_SAFE_INTEGER : 0;
+            if (valB === undefined) valB = sortField === 'inventoryOrder' ? Number.MAX_SAFE_INTEGER : 0;
+
+            // inventoryOrderでのソート時に値が同じ（または両方未定義の値）であれば、ID降順にフォールバック
+            if (sortField === 'inventoryOrder' && valA === valB) {
+                return sortAsc ? a.id - b.id : b.id - a.id;
+            }
+
             if (valA < valB) return sortAsc ? -1 : 1;
             if (valA > valB) return sortAsc ? 1 : -1;
             return 0;

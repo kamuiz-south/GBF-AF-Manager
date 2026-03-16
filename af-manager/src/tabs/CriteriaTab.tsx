@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Plus, Play, ChevronUp, ChevronDown, ChevronRight, Trash2, Filter, Copy } from 'lucide-react';
 import { db } from '../db';
-import type { AppArtifact, Condition } from '../types';
+import type { AppArtifact, Condition, ConditionGroup } from '../types';
 import { runCriteriaMatcher } from '../utils/matcher';
 import { useTranslation, type TranslationKey } from '../i18n';
 import { translateSkill, reverseTranslateSkill } from '../utils/skillMapping';
@@ -15,8 +15,20 @@ const KIND_NAMES_SHORT: Record<string, string> = {
 export default function CriteriaTab() {
     const { t, language } = useTranslation();
     const conditions = useLiveQuery(() => db.conditions.orderBy('priority').toArray()) || [];
+    const groups = (useLiveQuery(() => db.groups.orderBy('order').toArray()) || []) as ConditionGroup[];
     const [isAdding, setIsAdding] = useState(false);
     const topRef = useRef<HTMLDivElement>(null);
+    const [newGroupName, setNewGroupName] = useState('');
+    const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
+        try {
+            const saved = localStorage.getItem('af-manager-collapsed-groups');
+            return saved ? new Set(JSON.parse(saved)) : new Set();
+        } catch {
+            return new Set();
+        }
+    });
+    const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
+    const [editGroupName, setEditGroupName] = useState('');
 
     const [methodType, setMethodType] = useState<1 | 2>(1);
     const [name, setName] = useState('');
@@ -42,6 +54,7 @@ export default function CriteriaTab() {
 
     const [editingId, setEditingId] = useState<string | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
     const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
     const [selectedKeepAF, setSelectedKeepAF] = useState<AppArtifact | null>(null);
     const [condMemo, setCondMemo] = useState('');
@@ -198,24 +211,75 @@ export default function CriteriaTab() {
         }
     };
 
-    const moveUp = async (index: number) => {
-        if (index === 0) return;
-        const current = conditions[index];
-        const prev = conditions[index - 1];
-        await db.conditions.bulkPut([
-            { ...current, priority: index - 1 },
-            { ...prev, priority: index }
-        ]);
+    // === 新しいブロック順序管理ロジック ===
+    type BlockType = { type: 'group'; id: string; group: ConditionGroup; conds: Condition[]; topPriority: number; }
+        | { type: 'ungrouped'; id: string; conds: Condition[]; topPriority: number; };
+
+    const getBlocks = (): BlockType[] => {
+        const blocks: BlockType[] = [];
+        const seenGroups = new Set<string>();
+
+        // 1. 各グループのブロックを作る
+        for (const g of groups) {
+            const inGroup = conditions.filter(c => c.listId === g.id).sort((a, b) => a.priority - b.priority);
+            // グループが空の場合は仮想的に大きい優先度を設定（後に追加順等で並ぶ）
+            const topP = inGroup.length > 0 ? inGroup[0].priority : 99999 + g.order;
+            blocks.push({ type: 'group', id: g.id, group: g, conds: inGroup, topPriority: topP });
+            seenGroups.add(g.id);
+        }
+
+        // 2. 未分類条件のブロックを作る
+        const ungrouped = conditions.filter(c => !c.listId || c.listId === 'default').sort((a, b) => a.priority - b.priority);
+        for (const c of ungrouped) {
+            blocks.push({ type: 'ungrouped', id: c.id, conds: [c], topPriority: c.priority });
+        }
+
+        // 3. 全体を topPriority 順にソート (これが画面上のトップレベルの並びとなる)
+        blocks.sort((a, b) => a.topPriority - b.topPriority);
+        return blocks;
     };
 
-    const moveDown = async (index: number) => {
-        if (index === conditions.length - 1) return;
-        const current = conditions[index];
-        const next = conditions[index + 1];
-        await db.conditions.bulkPut([
-            { ...current, priority: index + 1 },
-            { ...next, priority: index }
-        ]);
+    const saveBlocksOrder = async (blocks: BlockType[]) => {
+        let p = 0;
+        let gOrder = 0;
+        const condUpdates: Condition[] = [];
+        const groupUpdates: ConditionGroup[] = [];
+
+        for (const b of blocks) {
+            if (b.type === 'group') {
+                groupUpdates.push({ ...b.group, order: gOrder++ });
+            }
+            for (const c of b.conds) {
+                condUpdates.push({ ...c, priority: p++ });
+            }
+        }
+        if (condUpdates.length > 0) await db.conditions.bulkPut(condUpdates);
+        if (groupUpdates.length > 0) await db.groups.bulkPut(groupUpdates);
+    };
+
+    const moveBlock = async (blockIndex: number, delta: -1 | 1) => {
+        const blocks = getBlocks();
+        const target = blockIndex + delta;
+        if (target < 0 || target >= blocks.length) return;
+        const temp = blocks[blockIndex];
+        blocks[blockIndex] = blocks[target];
+        blocks[target] = temp;
+        await saveBlocksOrder(blocks);
+    };
+
+    const moveIntraGroup = async (groupId: string, condId: string, delta: -1 | 1) => {
+        const blocks = getBlocks();
+        const groupBlock = blocks.find(b => b.type === 'group' && b.id === groupId);
+        if (!groupBlock) return;
+        const conds = groupBlock.conds;
+        const idx = conds.findIndex(c => c.id === condId);
+        if (idx === -1) return;
+        const target = idx + delta;
+        if (target < 0 || target >= conds.length) return;
+        const temp = conds[idx];
+        conds[idx] = conds[target];
+        conds[target] = temp;
+        await saveBlocksOrder(blocks);
     };
 
     const handleDelete = async (id: string) => {
@@ -279,6 +343,58 @@ export default function CriteriaTab() {
         setM2Kind2('');
         setCondMemo('');
     };
+
+    const handleToggleDisabled = async (c: Condition) => {
+        await db.conditions.put({ ...c, disabled: !c.disabled });
+    };
+
+    const handleAddGroup = async () => {
+        const trimmed = newGroupName.trim();
+        if (!trimmed) return;
+        await db.groups.put({ id: crypto.randomUUID(), name: trimmed, order: groups.length });
+        setNewGroupName('');
+    };
+
+    const handleRenameGroup = (group: ConditionGroup) => {
+        setEditingGroupId(group.id);
+        setEditGroupName(group.name);
+    };
+
+    const submitGroupRename = async () => {
+        if (!editingGroupId) return;
+        const trimmed = editGroupName.trim();
+        if (trimmed) {
+            const group = groups.find(g => g.id === editingGroupId);
+            if (group) await db.groups.put({ ...group, name: trimmed });
+        }
+        setEditingGroupId(null);
+        setEditGroupName('');
+    };
+
+    const handleDeleteGroup = async (group: ConditionGroup) => {
+        const affected = conditions.filter(c => c.listId === group.id);
+        if (affected.length > 0) await db.conditions.bulkPut(affected.map(c => ({ ...c, listId: 'default' })));
+        await db.groups.delete(group.id);
+    };
+
+    const handleMoveConditionToGroup = async (cond: Condition, newListId: string) => {
+        await db.conditions.put({ ...cond, listId: newListId });
+    };
+
+    const toggleGroupCollapse = (groupId: string) => {
+        setCollapsedGroups(prev => {
+            const next = new Set(prev);
+            if (next.has(groupId)) next.delete(groupId); else next.add(groupId);
+            try {
+                localStorage.setItem('af-manager-collapsed-groups', JSON.stringify([...next]));
+            } catch (e) {
+                console.error("Failed to save collapsed groups", e);
+            }
+            return next;
+        });
+    };
+
+    // ... handled by moveBlock / moveIntraGroup
 
     return (
         <div ref={topRef} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', height: '100%', maxWidth: '900px', margin: '0 auto' }}>
@@ -608,232 +724,367 @@ export default function CriteriaTab() {
                     </div>
                 )}
 
+                {/* Group management bar */}
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.6rem' }}>
+                    <input
+                        className="input"
+                        style={{ flex: 1, padding: '0.3rem 0.6rem', fontSize: 'var(--font-size-sub)' }}
+                        placeholder={language === 'en' ? 'New group name...' : '新しいグループ名...'}
+                        value={newGroupName}
+                        onChange={e => setNewGroupName(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') handleAddGroup(); }}
+                    />
+                    <button className="btn btn-ghost" onClick={handleAddGroup} disabled={!newGroupName.trim()} style={{ padding: '0.3rem 0.7rem', fontSize: 'var(--font-size-sub)', whiteSpace: 'nowrap', border: '1px solid var(--panel-border)' }}>
+                        + {language === 'en' ? 'Add Group' : 'グループ追加'}
+                    </button>
+                </div>
+
+                {/* Condition list – inline priority-order rendering */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-                    {conditions.map((c, i) => {
-                        const isExpanded = expandedIds.has(c.id);
-                        return (
-                            <div key={c.id} style={{ display: 'flex', flexDirection: 'column', background: 'var(--criteria-card-bg)', padding: '0.8rem 1rem', borderRadius: '8px', border: '1px solid var(--panel-border)', transition: 'all 0.2s', ':hover': { borderColor: 'var(--accent-blue)', opacity: 1 } } as any}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <div style={{ cursor: 'pointer', flex: 1 }} onClick={() => toggleExpand(c.id)}>
-                                        <div style={{ fontWeight: 'bold', fontSize: 'var(--font-size-main)', color: 'var(--accent-gold)', marginBottom: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                            {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />} {i + 1}. {c.name}
-                                        </div>
-                                        <div style={{ fontSize: 'calc(var(--font-size-sub) * 0.95)', color: 'var(--text-main)', display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                                            <span style={{ background: 'var(--dim-border)', padding: '2px 6px', borderRadius: '4px' }}>
-                                                {c.methodType === 1 ? (language === 'en' ? 'Skill Oriented' : 'スキル指向') : (language === 'en' ? `Character Oriented: ${c.characterName} (Count: ${c.targetCountMethod2})` : `キャラ指向: ${c.characterName} (確保: ${c.targetCountMethod2}個)`)}
-                                            </span>
-                                            {/* Show the priority-1 skill in the summary badge */}
-                                            {(() => {
-                                                const sk = Object.entries(c.skillPriorities)
-                                                    .find(([, p]) => p === 1);
-                                                const skName = sk ? c.skills[sk[0] as keyof typeof c.skills] : '';
-                                                return skName ? (
-                                                    <span style={{ background: 'rgba(59, 130, 246, 0.2)', color: 'var(--accent-blue-hover)', padding: '2px 6px', borderRadius: '4px' }}>
-                                                        {language === 'en' ? 'Target Skill:' : '対象スキル:'} <span style={{ color: 'var(--skill-name-color)', fontWeight: 500 }}>{language === 'en' ? translateSkill(skName, language) : skName}</span> {c.skillMustMatch[sk![0] as keyof typeof c.skillMustMatch] ? (language === 'en' ? '(Must Match)' : '(必須)') : (language === 'en' ? '(Optional)' : '(任意)')}
-                                                    </span>
-                                                ) : null;
-                                            })()}
-                                            {c.memo && (
-                                                <span style={{ color: 'var(--text-muted)', fontStyle: 'normal', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                                                    📝 {c.memo}
+                    {(() => {
+                        // Map to flattened RenderItem based on blocks
+                        const blocks = getBlocks();
+                        let displayNumCounter = 1;
+                        type RenderItem =
+                            | { kind: 'header'; group: ConditionGroup; blockIndex: number }
+                            | { kind: 'cond'; cond: Condition; blockIndex: number; isIntraGroup: boolean; intraIndex: number; intraCount: number; displayNum: number };
+
+                        const items: RenderItem[] = [];
+
+                        for (let bIdx = 0; bIdx < blocks.length; bIdx++) {
+                            const block = blocks[bIdx];
+                            if (block.type === 'group') {
+                                items.push({ kind: 'header', group: block.group, blockIndex: bIdx });
+                                if (!collapsedGroups.has(block.id)) {
+                                    for (let i = 0; i < block.conds.length; i++) {
+                                        items.push({ kind: 'cond', cond: block.conds[i], blockIndex: bIdx, isIntraGroup: true, intraIndex: i, intraCount: block.conds.length, displayNum: displayNumCounter++ });
+                                    }
+                                } else {
+                                    // Even if collapsed, increment display numbers so total maintains consistency
+                                    displayNumCounter += block.conds.length;
+                                }
+                            } else {
+                                // ungrouped
+                                items.push({ kind: 'cond', cond: block.conds[0], blockIndex: bIdx, isIntraGroup: false, intraIndex: 0, intraCount: 1, displayNum: displayNumCounter++ });
+                            }
+                        }
+
+                        return items.map((item) => {
+                            if (item.kind === 'header') {
+                                const { group, blockIndex } = item;
+                                const isCollapsed = collapsedGroups.has(group.id);
+                                const isEditing = editingGroupId === group.id;
+                                const groupCondCount = blocks[blockIndex].conds.length;
+
+                                return (
+                                    <div key={`hdr-${group.id}`}
+                                        onClick={() => !isEditing && toggleGroupCollapse(group.id)}
+                                        style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.3rem 0.6rem', background: 'var(--dim-bg)', borderRadius: '6px', cursor: isEditing ? 'default' : 'pointer', border: '1px solid var(--panel-border)', userSelect: 'none' }}
+                                    >
+                                        {!isEditing && (isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />)}
+                                        <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
+                                            {isEditing ? (
+                                                <input
+                                                    className="input"
+                                                    style={{ flex: 1, padding: '0.15rem 0.4rem', fontSize: 'var(--font-size-sub)' }}
+                                                    value={editGroupName}
+                                                    onChange={e => setEditGroupName(e.target.value)}
+                                                    onKeyDown={e => {
+                                                        if (e.key === 'Enter') submitGroupRename();
+                                                        if (e.key === 'Escape') setEditingGroupId(null);
+                                                    }}
+                                                    onClick={e => e.stopPropagation()}
+                                                    autoFocus
+                                                />
+                                            ) : (
+                                                <span style={{ fontWeight: 700, fontSize: 'var(--font-size-sub)', color: 'var(--accent-gold)' }}>
+                                                    {group.name} <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>({groupCondCount})</span>
                                                 </span>
                                             )}
                                         </div>
-                                    </div>
-
-                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                        <button className="btn btn-ghost" onClick={() => handleCopy(c)} style={{ padding: '0.4rem', fontSize: 'var(--font-size-sub)', color: 'var(--accent-blue-hover)' }} title={language === 'en' ? 'Copy' : 'コピー'}>
-                                            <Copy size={16} /> <span style={{ marginLeft: '0.2rem' }}>{language === 'en' ? 'Copy' : 'コピー'}</span>
-                                        </button>
-                                        <div style={{ width: '1px', background: 'var(--panel-border)', margin: '0 0.5rem' }} />
-                                        <button className="btn btn-ghost" onClick={() => handleEdit(c)} style={{ padding: '0.4rem', fontSize: 'var(--font-size-sub)' }} title={language === 'en' ? 'Edit' : '再編集'}>
-                                            {language === 'en' ? 'Edit' : '編集'}
-                                        </button>
-                                        <div style={{ width: '1px', background: 'var(--panel-border)', margin: '0 0.5rem' }} />
-                                        <button className="btn btn-ghost" onClick={() => moveUp(i)} disabled={i === 0} style={{ padding: '0.4rem', opacity: i === 0 ? 0.3 : 1 }} title={language === 'en' ? 'Move Up' : '優先度を上げる'}>
-                                            <ChevronUp size={20} />
-                                        </button>
-                                        <button className="btn btn-ghost" onClick={() => moveDown(i)} disabled={i === conditions.length - 1} style={{ padding: '0.4rem', opacity: i === conditions.length - 1 ? 0.3 : 1 }} title={language === 'en' ? 'Move Down' : '優先度を下げる'}>
-                                            <ChevronDown size={20} />
-                                        </button>
-                                        {deletingId === c.id ? (
-                                            <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center', marginLeft: '0.5rem', background: 'rgba(239, 68, 68, 0.1)', padding: '0.2rem 0.5rem', borderRadius: '4px', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
-                                                <span style={{ fontSize: 'var(--font-size-sub)', color: 'var(--accent-danger)', marginRight: '0.2rem' }}>{language === 'en' ? 'Delete?' : '本当に削除しますか？'}</span>
-                                                <button className="btn btn-danger" onClick={() => { handleDelete(c.id); setDeletingId(null); }} style={{ padding: '0.2rem 0.6rem', fontSize: 'var(--font-size-sub)' }}>{language === 'en' ? 'Delete' : '削除'}</button>
-                                                <button className="btn btn-ghost" onClick={() => setDeletingId(null)} style={{ padding: '0.2rem 0.6rem', fontSize: 'var(--font-size-sub)', color: 'var(--text-main)' }}>{language === 'en' ? 'Cancel' : 'キャンセル'}</button>
-                                            </div>
+                                        {isEditing ? (
+                                            <>
+                                                <button className="btn btn-primary" onClick={e => { e.stopPropagation(); submitGroupRename(); }} style={{ padding: '0.15rem 0.5rem', fontSize: 'calc(var(--font-size-sub)*0.9)' }}>{language === 'en' ? 'Save' : '保存'}</button>
+                                                <button className="btn btn-ghost" onClick={e => { e.stopPropagation(); setEditingGroupId(null); }} style={{ padding: '0.15rem 0.5rem', fontSize: 'calc(var(--font-size-sub)*0.9)' }}>{language === 'en' ? 'Cancel' : 'キャンセル'}</button>
+                                            </>
                                         ) : (
-                                            <button className="btn btn-danger" onClick={() => setDeletingId(c.id)} style={{ padding: '0.4rem', marginLeft: '0.5rem' }} title={language === 'en' ? 'Delete' : '削除'}>
-                                                <Trash2 size={18} />
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {isExpanded && (() => {
-                                    const keptAFs = allArtifacts
-                                        .filter(a => a.keepFlag === c.id)
-                                        .sort((a, b) => {
-                                            const attrDiff = parseInt(a.attribute) - parseInt(b.attribute);
-                                            if (attrDiff !== 0) return attrDiff;
-                                            return parseInt(a.kind) - parseInt(b.kind);
-                                        });
-                                    return (
-                                        <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px dashed var(--panel-border)', display: 'flex', gap: '1.5rem' }}>
-                                            {/* Left: condition details */}
-                                            <div style={{ flex: 1, fontSize: 'var(--font-size-main)', color: 'var(--text-muted)', minWidth: 0 }}>
-                                                {c.methodType === 1 && (
-                                                    <div style={{ marginBottom: '0.6rem' }}>
-                                                        <strong style={{ color: 'var(--text-main)' }}>{language === 'en' ? 'Target Amount (Element × Kind):' : '確保対象の属性×武器種:'}</strong>
-                                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.3rem' }}>
-                                                            {Object.entries(c.targetCount)
-                                                                .sort(([a], [b]) => {
-                                                                    const [aAttr, aKind] = a.split('_').map(Number);
-                                                                    const [bAttr, bKind] = b.split('_').map(Number);
-                                                                    return aAttr !== bAttr ? aAttr - bAttr : aKind - bKind;
-                                                                })
-                                                                .map(([key, count]) => {
-                                                                    const [attr, kind] = key.split('_');
-                                                                    return <span key={key} style={{ background: 'var(--criteria-detail-bg)', padding: '2px 6px', borderRadius: '4px', fontSize: 'var(--font-size-sub)' }}>{ATTRIBUTE_OPS.find(a => a.val === attr)?.label}{language === 'en' ? '' : '属性'}・{KIND_OPS.find(k => k.val === kind)?.label} ({count}{language === 'en' ? '' : '個'})</span>;
-                                                                })}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                {c.methodType === 2 && (
-                                                    <div style={{ marginBottom: '0.6rem' }}>
-                                                        <strong style={{ color: 'var(--text-main)' }}>{language === 'en' ? 'Character Oriented Target:' : 'キャラ指定条件:'}</strong><br />
-                                                        {language === 'en' ? 'Element:' : '属性:'} {ATTRIBUTE_OPS.find(a => a.val === c.attributes[0])?.label}<br />
-                                                        {language === 'en' ? 'Weapon Kind:' : '武器種:'} {KIND_OPS.find(k => k.val === c.weaponKinds[0])?.label}{c.weaponKinds2?.[0] ? ` ${language === 'en' ? 'or' : 'または'} ${KIND_OPS.find(k => k.val === c.weaponKinds2?.[0])?.label}` : ''}
-                                                    </div>
-                                                )}
-                                                <div style={{ marginTop: '0.5rem' }}>
-                                                    <strong style={{ color: 'var(--text-main)' }}>{language === 'en' ? 'Target Skills:' : '対象スキルの設定:'}</strong>
-                                                    <ul style={{ paddingLeft: '1.2rem', marginTop: '0.3rem', lineHeight: '1.5' }}>
-                                                        {([1, 2, 3, 4] as const).map(num => {
-                                                            const k = `skill${num}` as const;
-                                                            const s = c.skills[k];
-                                                            const p = c.skillPriorities[k];
-                                                            const m = c.skillMustMatch[k];
-                                                            if (!s) return null;
-                                                            const slotLabel = num <= 2 ? '[Ⅰ]' : num === 3 ? '[Ⅱ]' : '[Ⅲ]';
-                                                            const isInverted = k === 'skill3' && c.invertSkill3Quality && s === "最大HP上昇/防御力-70%";
-
-                                                            return (
-                                                                <li key={num} style={{ fontSize: 'var(--font-size-sub)' }}>
-                                                                    <span style={{ color: '#5eead4', fontWeight: 600, marginRight: '0.3rem' }}>{slotLabel}</span>
-                                                                    <span style={{ color: 'var(--skill-name-color)', fontWeight: 500 }}>{language === 'en' ? translateSkill(s, language) : s}</span> —
-                                                                    <span style={{ color: 'var(--accent-gold)' }}>★{language === 'en' ? 'Priority:' : '優先度:'}{p}</span>
-                                                                    {m ? <span style={{ color: 'var(--accent-danger)' }}>{language === 'en' ? ' (Must Match)' : ' (必須)'}</span> : (language === 'en' ? ' (Optional)' : ' (任意)')}
-                                                                    {isInverted && <span style={{ color: 'var(--accent-danger)', marginLeft: '0.5rem', fontWeight: 600 }}>{language === 'en' ? '[Quality Inverted]' : '[☆評価逆転]'}</span>}
-                                                                </li>
-                                                            );
-                                                        })}
-                                                    </ul>
-                                                </div>
-
-                                                {c.excludeSkills && c.excludeSkills.length > 0 && (
-                                                    <div style={{ marginTop: '0.5rem' }}>
-                                                        <strong style={{ color: 'var(--text-main)' }}>{language === 'en' ? 'Exclude Skills:' : '除外スキル:'}</strong>
-                                                        <ul style={{ paddingLeft: '1.2rem', marginTop: '0.3rem', lineHeight: '1.5' }}>
-                                                            {c.excludeSkills.map((ex, idx) => (
-                                                                <li key={idx} style={{ fontSize: 'var(--font-size-sub)', color: 'var(--accent-danger)' }}>
-                                                                    <span style={{ fontWeight: 500 }}>{language === 'en' ? translateSkill(ex, language) : ex}</span>
-                                                                </li>
-                                                            ))}
-                                                        </ul>
-                                                    </div>
-                                                )}
-
-                                                {c.excludeFavorites && (
-                                                    <div style={{ marginTop: '0.5rem', fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)' }}>
-                                                        🚫 {language === 'en' ? 'Favorited AFs are excluded' : 'お気に入り(鍵付き)のAFを除外'}
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            {/* Right: kept AF panel */}
-                                            <div style={{ width: '360px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                                                <div style={{ fontSize: 'var(--font-size-sub)', fontWeight: 600, color: 'var(--accent-blue-hover)', borderBottom: '1px solid var(--dim-border)', paddingBottom: '0.4rem', display: 'flex', justifyContent: 'space-between' }}>
-                                                    <span>{language === 'en' ? 'Saved AFs matching this condition' : '確保中のAF一覧'}</span>
-                                                    <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>
-                                                        {keptAFs.length}{language === 'en' ? ' matched' : '件'} / {language === 'en' ? 'Cap ' : '上限'}
-                                                        {c.methodType === 1
-                                                            ? Object.values(c.targetCount).reduce((a, b) => a + b, 0)
-                                                            : (c.targetCountMethod2 || 0)}{language === 'en' ? '' : '件'}
-                                                    </span>
-                                                </div>
-
-                                                {/* Selected AF detail box */}
-                                                {selectedKeepAF && selectedKeepAF.keepFlag === c.id && (
-                                                    <div style={{ background: 'var(--dim-bg)', borderRadius: '8px', padding: '0.8rem', borderLeft: '3px solid var(--accent-blue)', border: '1px solid var(--dim-border)' }}>
-                                                        <div style={{ fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-main)', fontSize: 'var(--font-size-sub)' }}>
-                                                            {selectedKeepAF.name} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>Lv{selectedKeepAF.level}</span>
-                                                        </div>
-                                                        {[selectedKeepAF.skill1_info, selectedKeepAF.skill2_info, selectedKeepAF.skill3_info, selectedKeepAF.skill4_info].map((sk, idx) => {
-                                                            if (!sk?.name) return null;
-                                                            const glabel = idx < 2 ? '[I]' : idx === 2 ? '[II]' : '[III]';
-                                                            const isMax = sk.skill_quality === 5;
-                                                            return (
-                                                                <div key={idx} style={{ display: 'flex', gap: '0.4rem', alignItems: 'baseline', marginBottom: '0.2rem', fontSize: 'calc(var(--font-size-sub) * 0.97)', lineHeight: '1.4' }}>
-                                                                    <span style={{ color: isMax ? 'var(--accent-purple)' : 'var(--accent-gold)', minWidth: '22px', flexShrink: 0 }}>★{sk.skill_quality}</span>
-                                                                    <span style={{ color: 'var(--accent-success)', minWidth: '26px', flexShrink: 0 }}>{glabel}</span>
-                                                                    <span style={{ color: 'var(--text-main)', flex: 1, wordBreak: 'break-all' }}>{language === 'en' ? translateSkill(sk.name, language) : sk.name}</span>
-                                                                    <span style={{ color: 'var(--accent-blue-hover)', flexShrink: 0 }}>{sk.effect_value}</span>
-                                                                </div>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                )}
-
-                                                {/* AF list table */}
-                                                {keptAFs.length === 0 ? (
-                                                    <div style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-sub)', padding: '1rem', textAlign: 'center', background: 'rgba(0,0,0,0.15)', borderRadius: '6px' }}>
-                                                        {language === 'en' ? <><br />No AFs match this condition.<br />Please execute "Calculate Keep Flags".</> : <>確保対象のAFがありません。<br />「確保フラグ一括計算」を実行してください。</>}
+                                            <>
+                                                <button className="btn btn-ghost" onClick={e => { e.stopPropagation(); handleRenameGroup(group); }} style={{ padding: '0.2rem', opacity: 0.7 }} title={language === 'en' ? 'Rename Group' : 'グループ名を変更'}><span style={{ fontSize: 'var(--font-size-sub)' }}>✎</span></button>
+                                                <button className="btn btn-ghost" onClick={e => { e.stopPropagation(); moveBlock(blockIndex, -1); }} disabled={blockIndex === 0} style={{ padding: '0.2rem', opacity: blockIndex === 0 ? 0.3 : 1 }} title={language === 'en' ? 'Move Group Up' : 'グループを上へ'}><ChevronUp size={13} /></button>
+                                                <button className="btn btn-ghost" onClick={e => { e.stopPropagation(); moveBlock(blockIndex, 1); }} disabled={blockIndex >= blocks.length - 1} style={{ padding: '0.2rem', opacity: blockIndex >= blocks.length - 1 ? 0.3 : 1 }} title={language === 'en' ? 'Move Group Down' : 'グループを下へ'}><ChevronDown size={13} /></button>
+                                                
+                                                {deletingGroupId === group.id ? (
+                                                    <div style={{ display: 'flex', gap: '0.2rem', alignItems: 'center', background: 'rgba(239, 68, 68, 0.1)', padding: '0.1rem 0.3rem', borderRadius: '4px', border: '1px solid rgba(239, 68, 68, 0.3)' }} onClick={e => e.stopPropagation()}>
+                                                        <span style={{ fontSize: 'calc(var(--font-size-sub)*0.9)', color: 'var(--accent-danger)' }}>{language === 'en' ? 'Delete?' : '削除?'}</span>
+                                                        <button className="btn btn-danger" onClick={() => { handleDeleteGroup(group); setDeletingGroupId(null); }} style={{ padding: '0.1rem 0.3rem', fontSize: 'calc(var(--font-size-sub)*0.9)' }}>{language === 'en' ? 'Yes' : '削除'}</button>
+                                                        <button className="btn btn-ghost" onClick={() => setDeletingGroupId(null)} style={{ padding: '0.1rem 0.3rem', fontSize: 'calc(var(--font-size-sub)*0.9)' }}>{language === 'en' ? 'No' : '取消'}</button>
                                                     </div>
                                                 ) : (
-                                                    <div style={{ maxHeight: '600px', overflowY: 'auto', borderRadius: '6px', border: '1px solid var(--dim-border)' }}>
-                                                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'calc(var(--font-size-sub) * 0.97)' }}>
-                                                            <thead style={{ position: 'sticky', top: 0, background: 'var(--panel-bg)' }}>
-                                                                <tr style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--dim-border)' }}>
-                                                                    <th style={{ textAlign: 'left', padding: '0.3rem 0.5rem', fontWeight: 500 }}>ID</th>
-                                                                    <th style={{ textAlign: 'left', padding: '0.3rem 0.5rem', fontWeight: 500 }}>{language === 'en' ? 'Element' : '属性'}</th>
-                                                                    <th style={{ textAlign: 'left', padding: '0.3rem 0.5rem', fontWeight: 500 }}>{language === 'en' ? 'Weapon' : '武器種'}</th>
-                                                                    <th style={{ textAlign: 'right', padding: '0.3rem 0.5rem', fontWeight: 500 }}>{language === 'en' ? 'Score' : '評価値'}</th>
-                                                                    <th style={{ textAlign: 'center', padding: '0.3rem 0.5rem', fontWeight: 500 }}>{language === 'en' ? 'Status' : '状態'}</th>
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody>
-                                                                {keptAFs.map(af => (
-                                                                    <tr
-                                                                        key={af.id}
-                                                                        onClick={() => setSelectedKeepAF(af)}
-                                                                        style={{
-                                                                            cursor: 'pointer',
-                                                                            background: selectedKeepAF?.id === af.id ? 'rgba(59,130,246,0.15)' : 'transparent',
-                                                                            borderBottom: '1px solid var(--dim-border)',
-                                                                        }}
-                                                                    >
-                                                                        <td style={{ padding: '0.3rem 0.5rem', color: 'var(--text-muted)' }}>{af.id}</td>
-                                                                        <td style={{ padding: '0.3rem 0.5rem' }}>{language === 'en' ? t(`ATTR_${af.attribute}` as TranslationKey) : (ATTR_NAMES[af.attribute] || af.attribute)}</td>
-                                                                        <td style={{ padding: '0.3rem 0.5rem' }}>{language === 'en' ? t(`WPN_${af.kind}` as TranslationKey) : (KIND_NAMES_SHORT[af.kind] || af.kind)}</td>
-                                                                        <td style={{ padding: '0.3rem 0.5rem', textAlign: 'right', color: 'var(--accent-gold)' }}>{af.evaluationScore != null ? af.evaluationScore.toFixed(1) : '-'}</td>
-                                                                        <td style={{ padding: '0.3rem 0.5rem', textAlign: 'center' }}>
-                                                                            {af.is_locked && <span style={{ color: 'var(--accent-gold)', fontSize: 'calc(var(--font-size-sub) * 0.87)', marginRight: '2px' }}>Fav</span>}
-                                                                            {af.is_unnecessary && <span style={{ color: 'var(--accent-purple)', fontSize: 'calc(var(--font-size-sub) * 0.87)' }}>{language === 'en' ? 'Trash' : '不用'}</span>}
-                                                                        </td>
-                                                                    </tr>
-                                                                ))}
-                                                            </tbody>
-                                                        </table>
-                                                    </div>
+                                                    <button className="btn btn-ghost" onClick={e => { e.stopPropagation(); setDeletingGroupId(group.id); }} style={{ padding: '0.2rem', color: 'var(--accent-danger)', opacity: 0.7 }} title={language === 'en' ? 'Delete Group' : 'グループを削除'}><Trash2 size={13} /></button>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+                                );
+                            }
+
+                            // Condition card
+                            const { cond: c, blockIndex, isIntraGroup, intraIndex, intraCount, displayNum } = item;
+                            const inGroup = c.listId && c.listId !== 'default';
+                            // No need to check collapsedGroups here, as the `items` array already filters them out
+                            const isExpanded = expandedIds.has(c.id);
+
+                            return (
+                                <div key={c.id} style={{ display: 'flex', flexDirection: 'column', background: 'var(--criteria-card-bg)', padding: '0.8rem 1rem', borderRadius: '8px', border: '1px solid var(--panel-border)', transition: 'all 0.2s', opacity: c.disabled ? 0.45 : 1, filter: c.disabled ? 'grayscale(0.4)' : 'none', marginLeft: inGroup ? '0.75rem' : 0 } as any}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                        {/* Left: clickable info */}
+                                        <div style={{ cursor: 'pointer', flex: 1, minWidth: 0 }} onClick={() => toggleExpand(c.id)}>
+                                            <div style={{ fontWeight: 'bold', fontSize: 'var(--font-size-main)', color: 'var(--accent-gold)', marginBottom: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />} {displayNum}. {c.name}
+                                            </div>
+                                            <div style={{ fontSize: 'calc(var(--font-size-sub) * 0.95)', color: 'var(--text-main)', display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                                                <span style={{ background: 'var(--dim-border)', padding: '2px 6px', borderRadius: '4px' }}>
+                                                    {c.methodType === 1 ? (language === 'en' ? 'Skill Oriented' : 'スキル指向') : (language === 'en' ? `Character Oriented: ${c.characterName} (Count: ${c.targetCountMethod2})` : `キャラ指向: ${c.characterName} (確保: ${c.targetCountMethod2}個)`)}
+                                                </span>
+                                                {/* Skill badge: show highest-priority filled skill */}
+                                                {(() => {
+                                                    const SKILL_KEYS = ['skill1', 'skill2', 'skill3', 'skill4'] as const;
+                                                    const filledKeys = SKILL_KEYS.filter(k => c.skills[k]);
+                                                    if (filledKeys.length === 0) return null;
+                                                    const sorted = [...filledKeys].sort((a, b) => (c.skillPriorities[a] ?? Infinity) - (c.skillPriorities[b] ?? Infinity));
+                                                    const topKey = sorted[0];
+                                                    const skName = c.skills[topKey];
+                                                    return skName ? (
+                                                        <span style={{ background: 'rgba(59, 130, 246, 0.2)', color: 'var(--accent-blue-hover)', padding: '2px 6px', borderRadius: '4px' }}>
+                                                            {language === 'en' ? 'Target Skill:' : '対象スキル:'} <span style={{ color: 'var(--skill-name-color)', fontWeight: 500 }}>{language === 'en' ? translateSkill(skName, language) : skName}</span> {c.skillMustMatch[topKey] ? (language === 'en' ? '(Must Match)' : '(必須)') : (language === 'en' ? '(Optional)' : '(任意)')}
+                                                        </span>
+                                                    ) : null;
+                                                })()}
+                                                {c.memo && (
+                                                    <span style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                                        📝 {c.memo}
+                                                    </span>
                                                 )}
                                             </div>
                                         </div>
-                                    );
-                                })()}
-                            </div>
-                        );
-                    })}
+
+                                        {/* Right: 2-row action buttons */}
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', alignItems: 'flex-end', marginLeft: '0.8rem', flexShrink: 0 }}>
+                                            {/* Row 1: Disable | Copy | Edit */}
+                                            <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+                                                <button className="btn btn-ghost" onClick={() => handleToggleDisabled(c)} style={{ padding: '0.3rem 0.5rem', fontSize: 'var(--font-size-sub)', color: c.disabled ? 'var(--accent-success)' : 'var(--text-muted)' }} title={c.disabled ? (language === 'en' ? 'Enable' : '有効にする') : (language === 'en' ? 'Disable' : '無効にする')}>
+                                                    {c.disabled ? (language === 'en' ? '✓ Enable' : '✓ 有効') : (language === 'en' ? '⊘ Disable' : '⊘ 無効')}
+                                                </button>
+                                                <div style={{ width: '1px', background: 'var(--panel-border)', alignSelf: 'stretch' }} />
+                                                <button className="btn btn-ghost" onClick={() => handleCopy(c)} style={{ padding: '0.4rem', fontSize: 'var(--font-size-sub)', color: 'var(--accent-blue-hover)' }} title={language === 'en' ? 'Copy' : 'コピー'}>
+                                                    <Copy size={16} />
+                                                </button>
+                                                <button className="btn btn-ghost" onClick={() => handleEdit(c)} style={{ padding: '0.4rem', fontSize: 'var(--font-size-sub)' }} title={language === 'en' ? 'Edit' : '再編集'}>
+                                                    {language === 'en' ? 'Edit' : '編集'}
+                                                </button>
+                                            </div>
+                                            {/* Row 2: Up | Down | Delete */}
+                                            <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+                                                {isIntraGroup ? (
+                                                    <>
+                                                        <button className="btn btn-ghost" onClick={() => moveIntraGroup(c.listId!, c.id, -1)} disabled={intraIndex === 0} style={{ padding: '0.4rem', opacity: intraIndex === 0 ? 0.3 : 1 }} title={language === 'en' ? 'Move Up (In Group)' : 'グループ内で優先度を上げる'}>
+                                                            <ChevronUp size={18} />
+                                                        </button>
+                                                        <button className="btn btn-ghost" onClick={() => moveIntraGroup(c.listId!, c.id, 1)} disabled={intraIndex >= intraCount! - 1} style={{ padding: '0.4rem', opacity: intraIndex >= intraCount! - 1 ? 0.3 : 1 }} title={language === 'en' ? 'Move Down (In Group)' : 'グループ内で優先度を下げる'}>
+                                                            <ChevronDown size={18} />
+                                                        </button>
+                                                    </>
+                                                ) : (
+                                                    // Ungrouped top-level move
+                                                    <>
+                                                        <button className="btn btn-ghost" onClick={() => moveBlock(blockIndex, -1)} disabled={blockIndex === 0} style={{ padding: '0.4rem', opacity: blockIndex === 0 ? 0.3 : 1 }} title={language === 'en' ? 'Move Block Up' : 'ブロックごと優先度を上げる'}>
+                                                            <ChevronUp size={18} />
+                                                        </button>
+                                                        <button className="btn btn-ghost" onClick={() => moveBlock(blockIndex, 1)} disabled={blockIndex >= blocks.length - 1} style={{ padding: '0.4rem', opacity: blockIndex >= blocks.length - 1 ? 0.3 : 1 }} title={language === 'en' ? 'Move Block Down' : 'ブロックごと優先度を下げる'}>
+                                                            <ChevronDown size={18} />
+                                                        </button>
+                                                    </>
+                                                )}
+                                                <div style={{ width: '1px', background: 'var(--panel-border)', alignSelf: 'stretch' }} />
+                                                {deletingId === c.id ? (
+                                                    <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center', background: 'rgba(239, 68, 68, 0.1)', padding: '0.2rem 0.5rem', borderRadius: '4px', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+                                                        <span style={{ fontSize: 'var(--font-size-sub)', color: 'var(--accent-danger)' }}>{language === 'en' ? 'Delete?' : '削除?'}</span>
+                                                        <button className="btn btn-danger" onClick={() => { handleDelete(c.id); setDeletingId(null); }} style={{ padding: '0.1rem 0.5rem', fontSize: 'var(--font-size-sub)' }}>{language === 'en' ? 'Delete' : '削除'}</button>
+                                                        <button className="btn btn-ghost" onClick={() => setDeletingId(null)} style={{ padding: '0.1rem 0.5rem', fontSize: 'var(--font-size-sub)' }}>{language === 'en' ? 'Cancel' : 'キャンセル'}</button>
+                                                    </div>
+                                                ) : (
+                                                    <button className="btn btn-danger" onClick={() => setDeletingId(c.id)} style={{ padding: '0.4rem' }} title={language === 'en' ? 'Delete' : '削除'}>
+                                                        <Trash2 size={18} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Group assignment dropdown */}
+                                    {groups.length > 0 && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.4rem', paddingTop: '0.4rem', borderTop: '1px solid var(--panel-border)' }}>
+                                            <span style={{ fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{language === 'en' ? 'Group:' : 'グループ:'}</span>
+                                            <select
+                                                className="input"
+                                                style={{ flex: 1, padding: '0.15rem 0.4rem', fontSize: 'var(--font-size-sub)' }}
+                                                value={c.listId || 'default'}
+                                                onChange={e => handleMoveConditionToGroup(c, e.target.value)}
+                                            >
+                                                <option value="default">{language === 'en' ? 'Ungrouped' : '未分類'}</option>
+                                                {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                                            </select>
+                                        </div>
+                                    )}
+
+                                    {/* Expanded condition detail */}
+                                    {isExpanded && (() => {
+                                        const keptAFs = allArtifacts
+                                            .filter(a => a.keepFlag === c.id)
+                                            .sort((a, b) => {
+                                                const attrDiff = parseInt(a.attribute) - parseInt(b.attribute);
+                                                if (attrDiff !== 0) return attrDiff;
+                                                return parseInt(a.kind) - parseInt(b.kind);
+                                            });
+                                        return (
+                                            <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px dashed var(--panel-border)', display: 'flex', gap: '1.5rem' }}>
+                                                {/* Left: condition details */}
+                                                <div style={{ flex: 1, fontSize: 'var(--font-size-main)', color: 'var(--text-muted)', minWidth: 0 }}>
+                                                    {c.methodType === 1 && (
+                                                        <div style={{ marginBottom: '0.6rem' }}>
+                                                            <strong style={{ color: 'var(--text-main)' }}>{language === 'en' ? 'Target Amount (Element × Kind):' : '確保対象の属性×武器種:'}</strong>
+                                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.3rem' }}>
+                                                                {Object.entries(c.targetCount)
+                                                                    .sort(([a], [b]) => {
+                                                                        const [aAttr, aKind] = a.split('_').map(Number);
+                                                                        const [bAttr, bKind] = b.split('_').map(Number);
+                                                                        return aAttr !== bAttr ? aAttr - bAttr : aKind - bKind;
+                                                                    })
+                                                                    .map(([key, count]) => {
+                                                                        const [attr, kind] = key.split('_');
+                                                                        return <span key={key} style={{ background: 'var(--criteria-detail-bg)', padding: '2px 6px', borderRadius: '4px', fontSize: 'var(--font-size-sub)' }}>{ATTRIBUTE_OPS.find(a => a.val === attr)?.label}{language === 'en' ? '' : '属性'}・{KIND_OPS.find(k => k.val === kind)?.label} ({count}{language === 'en' ? '' : '個'})</span>;
+                                                                    })}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    {c.methodType === 2 && (
+                                                        <div style={{ marginBottom: '0.6rem' }}>
+                                                            <strong style={{ color: 'var(--text-main)' }}>{language === 'en' ? 'Character Oriented Target:' : 'キャラ指定条件:'}</strong><br />
+                                                            {language === 'en' ? 'Element:' : '属性:'} {ATTRIBUTE_OPS.find(a => a.val === c.attributes[0])?.label}<br />
+                                                            {language === 'en' ? 'Weapon Kind:' : '武器種:'} {KIND_OPS.find(k => k.val === c.weaponKinds[0])?.label}{c.weaponKinds2?.[0] ? ` ${language === 'en' ? 'or' : 'または'} ${KIND_OPS.find(k => k.val === c.weaponKinds2?.[0])?.label}` : ''}
+                                                        </div>
+                                                    )}
+                                                    <div style={{ marginTop: '0.5rem' }}>
+                                                        <strong style={{ color: 'var(--text-main)' }}>{language === 'en' ? 'Target Skills:' : '対象スキルの設定:'}</strong>
+                                                        <ul style={{ paddingLeft: '1.2rem', marginTop: '0.3rem', lineHeight: '1.5' }}>
+                                                            {([1, 2, 3, 4] as const).map(num => {
+                                                                const k = `skill${num}` as const;
+                                                                const s = c.skills[k];
+                                                                const p = c.skillPriorities[k];
+                                                                const m = c.skillMustMatch[k];
+                                                                if (!s) return null;
+                                                                const slotLabel = num <= 2 ? '[Ⅰ]' : num === 3 ? '[Ⅱ]' : '[Ⅲ]';
+                                                                const isInverted = k === 'skill3' && c.invertSkill3Quality && s === "最大HP上昇/防御力-70%";
+                                                                return (
+                                                                    <li key={num} style={{ fontSize: 'var(--font-size-sub)' }}>
+                                                                        <span style={{ color: '#5eead4', fontWeight: 600, marginRight: '0.3rem' }}>{slotLabel}</span>
+                                                                        <span style={{ color: 'var(--skill-name-color)', fontWeight: 500 }}>{language === 'en' ? translateSkill(s, language) : s}</span> —
+                                                                        <span style={{ color: 'var(--accent-gold)' }}>★{language === 'en' ? 'Priority:' : '優先度:'}{p}</span>
+                                                                        {m ? <span style={{ color: 'var(--accent-danger)' }}>{language === 'en' ? ' (Must Match)' : ' (必須)'}</span> : (language === 'en' ? ' (Optional)' : ' (任意)')}
+                                                                        {isInverted && <span style={{ color: 'var(--accent-danger)', marginLeft: '0.5rem', fontWeight: 600 }}>{language === 'en' ? '[Quality Inverted]' : '[☆評価逆転]'}</span>}
+                                                                    </li>
+                                                                );
+                                                            })}
+                                                        </ul>
+                                                    </div>
+                                                    {c.excludeSkills && c.excludeSkills.length > 0 && (
+                                                        <div style={{ marginTop: '0.5rem' }}>
+                                                            <strong style={{ color: 'var(--text-main)' }}>{language === 'en' ? 'Exclude Skills:' : '除外スキル:'}</strong>
+                                                            <ul style={{ paddingLeft: '1.2rem', marginTop: '0.3rem', lineHeight: '1.5' }}>
+                                                                {c.excludeSkills.map((ex, idx) => (
+                                                                    <li key={idx} style={{ fontSize: 'var(--font-size-sub)', color: 'var(--accent-danger)' }}>
+                                                                        <span style={{ fontWeight: 500 }}>{language === 'en' ? translateSkill(ex, language) : ex}</span>
+                                                                    </li>
+                                                                ))}
+                                                            </ul>
+                                                        </div>
+                                                    )}
+                                                    {c.excludeFavorites && (
+                                                        <div style={{ marginTop: '0.5rem', fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)' }}>
+                                                            🚫 {language === 'en' ? 'Favorited AFs are excluded' : 'お気に入り(鍵付き)のAFを除外'}
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Right: kept AF panel */}
+                                                <div style={{ width: '360px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                                                    <div style={{ fontSize: 'var(--font-size-sub)', fontWeight: 600, color: 'var(--accent-blue-hover)', borderBottom: '1px solid var(--dim-border)', paddingBottom: '0.4rem', display: 'flex', justifyContent: 'space-between' }}>
+                                                        <span>{language === 'en' ? 'Saved AFs matching this condition' : '確保中のAF一覧'}</span>
+                                                        <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>
+                                                            {keptAFs.length}{language === 'en' ? ' matched' : '件'} / {language === 'en' ? 'Cap ' : '上限'}
+                                                            {c.methodType === 1 ? Object.values(c.targetCount).reduce((a, b) => a + b, 0) : (c.targetCountMethod2 || 0)}{language === 'en' ? '' : '件'}
+                                                        </span>
+                                                    </div>
+                                                    {selectedKeepAF && selectedKeepAF.keepFlag === c.id && (
+                                                        <div style={{ background: 'var(--dim-bg)', borderRadius: '8px', padding: '0.8rem', border: '1px solid var(--dim-border)' }}>
+                                                            <div style={{ fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-main)', fontSize: 'var(--font-size-sub)' }}>
+                                                                {selectedKeepAF.name} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>Lv{selectedKeepAF.level}</span>
+                                                            </div>
+                                                            {[selectedKeepAF.skill1_info, selectedKeepAF.skill2_info, selectedKeepAF.skill3_info, selectedKeepAF.skill4_info].map((sk, idx) => {
+                                                                if (!sk?.name) return null;
+                                                                const glabel = idx < 2 ? '[I]' : idx === 2 ? '[II]' : '[III]';
+                                                                return (
+                                                                    <div key={idx} style={{ display: 'flex', gap: '0.4rem', alignItems: 'baseline', marginBottom: '0.2rem', fontSize: 'calc(var(--font-size-sub) * 0.97)', lineHeight: '1.4' }}>
+                                                                        <span style={{ color: sk.skill_quality === 5 ? 'var(--accent-purple)' : 'var(--accent-gold)', minWidth: '22px', flexShrink: 0 }}>★{sk.skill_quality}</span>
+                                                                        <span style={{ color: 'var(--accent-success)', minWidth: '26px', flexShrink: 0 }}>{glabel}</span>
+                                                                        <span style={{ color: 'var(--text-main)', flex: 1, wordBreak: 'break-all' }}>{language === 'en' ? translateSkill(sk.name, language) : sk.name}</span>
+                                                                        <span style={{ color: 'var(--accent-blue-hover)', flexShrink: 0 }}>{sk.effect_value}</span>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
+                                                    {keptAFs.length === 0 ? (
+                                                        <div style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-sub)', padding: '1rem', textAlign: 'center', background: 'rgba(0,0,0,0.15)', borderRadius: '6px' }}>
+                                                            {language === 'en' ? <><br />No AFs match this condition.<br />Please execute "Calculate Keep Flags".</> : <>確保対象のAFがありません。<br />「確保フラグ一括計算」を実行してください。</>}
+                                                        </div>
+                                                    ) : (
+                                                        <div style={{ maxHeight: '600px', overflowY: 'auto', borderRadius: '6px', border: '1px solid var(--dim-border)' }}>
+                                                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'calc(var(--font-size-sub) * 0.97)' }}>
+                                                                <thead style={{ position: 'sticky', top: 0, background: 'var(--panel-bg)' }}>
+                                                                    <tr style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--dim-border)' }}>
+                                                                        <th style={{ textAlign: 'left', padding: '0.3rem 0.5rem', fontWeight: 500 }}>ID</th>
+                                                                        <th style={{ textAlign: 'left', padding: '0.3rem 0.5rem', fontWeight: 500 }}>{language === 'en' ? 'Element' : '属性'}</th>
+                                                                        <th style={{ textAlign: 'left', padding: '0.3rem 0.5rem', fontWeight: 500 }}>{language === 'en' ? 'Weapon' : '武器種'}</th>
+                                                                        <th style={{ textAlign: 'right', padding: '0.3rem 0.5rem', fontWeight: 500 }}>{language === 'en' ? 'Score' : '評価値'}</th>
+                                                                        <th style={{ textAlign: 'center', padding: '0.3rem 0.5rem', fontWeight: 500 }}>{language === 'en' ? 'Status' : '状態'}</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody>
+                                                                    {keptAFs.map(af => (
+                                                                        <tr key={af.id} onClick={() => setSelectedKeepAF(af)} style={{ cursor: 'pointer', background: selectedKeepAF?.id === af.id ? 'rgba(59,130,246,0.15)' : 'transparent', borderBottom: '1px solid var(--dim-border)' }}>
+                                                                            <td style={{ padding: '0.3rem 0.5rem', color: 'var(--text-muted)' }}>{af.id}</td>
+                                                                            <td style={{ padding: '0.3rem 0.5rem' }}>{language === 'en' ? t(`ATTR_${af.attribute}` as TranslationKey) : (ATTR_NAMES[af.attribute] || af.attribute)}</td>
+                                                                            <td style={{ padding: '0.3rem 0.5rem' }}>{language === 'en' ? t(`WPN_${af.kind}` as TranslationKey) : (KIND_NAMES_SHORT[af.kind] || af.kind)}</td>
+                                                                            <td style={{ padding: '0.3rem 0.5rem', textAlign: 'right', color: 'var(--accent-gold)' }}>{af.evaluationScore != null ? af.evaluationScore.toFixed(1) : '-'}</td>
+                                                                            <td style={{ padding: '0.3rem 0.5rem', textAlign: 'center' }}>
+                                                                                {af.is_locked && <span style={{ color: 'var(--accent-gold)', fontSize: 'calc(var(--font-size-sub) * 0.87)', marginRight: '2px' }}>Fav</span>}
+                                                                                {af.is_unnecessary && <span style={{ color: 'var(--accent-purple)', fontSize: 'calc(var(--font-size-sub) * 0.87)' }}>{language === 'en' ? 'Trash' : '不用'}</span>}
+                                                                            </td>
+                                                                        </tr>
+                                                                    ))}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+                            );
+                        });
+                    })()}
 
                     {conditions.length === 0 && !isAdding && (
                         <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '3rem', background: 'var(--dim-bg)', borderRadius: '8px' }}>

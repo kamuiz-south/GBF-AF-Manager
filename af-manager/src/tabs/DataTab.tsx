@@ -20,6 +20,13 @@ export default function DataTab() {
     const [dragOver, setDragOver] = useState(false);
 
     const totalArtifacts = useLiveQuery(() => db.artifacts.count()) || 0;
+    const globalSettings = useLiveQuery(() => db.settings.get('global'));
+    const lastImportedAt = globalSettings?.lastImportedAt;
+
+    const recordImportTimestamp = async () => {
+        const s = await db.settings.get('global') || DEFAULT_SETTINGS;
+        await db.settings.put({ ...s, lastImportedAt: new Date().toISOString() });
+    };
 
     // Phase 2: AF Collector 拡張機能からの直接送信を受け取る
     useEffect(() => {
@@ -100,6 +107,7 @@ export default function DataTab() {
 
         await db.artifacts.clear();
         await db.artifacts.bulkPut(newItems);
+        await recordImportTimestamp();
 
         setStatus({
             type: 'success',
@@ -117,6 +125,7 @@ export default function DataTab() {
             const settings = await getSettings();
             newItems.forEach(item => { item.evaluationScore = evaluateArtifact(item, settings); });
             await db.artifacts.bulkPut(newItems);
+            await recordImportTimestamp();
             setStatus({ type: 'success', message: language === 'en' ? `Imported ${newItems.length} artifacts! You can continue pasting the next page.` : `${newItems.length}件のアーティファクトを取り込みました！新しいページがあれば続けて入力してください。` });
             setJsonInput('');
         } catch (e: any) {
@@ -130,7 +139,19 @@ export default function DataTab() {
         try {
             setStatus({ type: 'idle', message: language === 'en' ? 'Loading...' : '読み込み中...' });
             const text = await file.text();
-            const json = JSON.parse(text);
+            let json;
+            try {
+                json = JSON.parse(text);
+            } catch {
+                throw new Error(language === 'en' ? 'Invalid JSON format.' : '不正なJSONデータです。');
+            }
+
+            if (json.settings || (json.conditions && !json.artifacts && !json.list && !json.af_collector)) {
+                // Settings or Conditions-only file detected -> definitely a backup file
+                alert(language === 'en' ? 'Error: This is a Backup or Criteria file.\nPlease import it from the "Settings" tab.' : 'エラー：これはバックアップデータ、または条件の復元用ファイルです。\n「設定」タブの画面から復元してください。');
+                setStatus({ type: 'idle', message: '' });
+                return;
+            }
 
             if (json.af_collector === true) {
                 await importCollectorJson(json);
@@ -141,6 +162,7 @@ export default function DataTab() {
                 const settings = await getSettings();
                 newItems.forEach(item => { item.evaluationScore = evaluateArtifact(item, settings); });
                 await db.artifacts.bulkPut(newItems);
+                await recordImportTimestamp();
                 setStatus({ type: 'success', message: language === 'en' ? `Imported ${newItems.length} artifacts!` : `${newItems.length}件のアーティファクトを取り込みました！` });
             }
         } catch (e: any) {
@@ -175,9 +197,14 @@ export default function DataTab() {
                     <Database size={22} /> {t('DATA_TITLE', '所持AFのデータ取り込み')}
                 </h2>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <span style={{ fontSize: 'var(--font-size-main)', color: 'var(--text-muted)' }}>
+                    <div style={{ fontSize: 'var(--font-size-main)', color: 'var(--text-muted)', textAlign: 'right' }}>
                         {language === 'en' ? 'Loaded Artifacts' : '現在保持されているAF数'}: <strong style={{ color: 'var(--text-main)', fontSize: 'calc(var(--font-size-main) * 1.1)' }}>{totalArtifacts}</strong> {language === 'en' ? 'items' : '件'}
-                    </span>
+                        {lastImportedAt && (
+                            <div style={{ marginTop: '0.2rem', fontSize: 'calc(var(--font-size-sub) * 0.95)', color: 'var(--text-muted)' }}>
+                                {language === 'en' ? 'Last import:' : '最終取込:'} {new Date(lastImportedAt).toLocaleString(language === 'en' ? 'en-US' : 'ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                        )}
+                    </div>
                     {totalArtifacts > 0 && (
                         <button className="btn btn-ghost" style={{ border: '1px solid var(--accent-danger)', color: 'var(--accent-danger)', padding: '0.4rem 0.8rem' }} onClick={clearData}>
                             <Trash2 size={16} /> {language === 'en' ? 'Format DB' : '初期化'}

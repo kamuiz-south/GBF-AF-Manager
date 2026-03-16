@@ -8,6 +8,9 @@ export function runCriteriaMatcher(artifacts: AppArtifact[], conditions: Conditi
     const sortedConditions = [...conditions].sort((a, b) => a.priority - b.priority);
 
     for (const cond of sortedConditions) {
+        // Skip conditions that have been temporarily disabled by the user
+        if (cond.disabled) continue;
+
         let requiredCount = cond.methodType === 1
             ? Object.values(cond.targetCount).reduce((a, b) => a + b, 0)
             : cond.targetCountMethod2;

@@ -146,12 +146,27 @@ export default function SettingsTab() {
             const reader = new FileReader();
             reader.onload = async (e: ProgressEvent<FileReader>) => {
                 try {
-                    await importDatabase(e.target?.result as string);
+                    const resultStr = e.target?.result as string;
+
+                    // JSONの中身をチェックしてAFデータかバックアップかを判定
+                    let parsed;
+                    try {
+                        parsed = JSON.parse(resultStr);
+                    } catch {
+                        throw new Error(language === 'en' ? 'Invalid JSON format.' : '不正なJSONデータです。');
+                    }
+
+                    if (parsed.af_collector === true || Array.isArray(parsed.list)) {
+                        alert(language === 'en' ? 'Error: This file is an Artifact Data file, not a Backup.\nPlease import it from the "Data" tab.' : 'エラー：これはAF取込用のデータファイルです。\n「データ管理」タブの画面から取り込んでください。');
+                        return;
+                    }
+
+                    await importDatabase(resultStr);
                     alert(language === 'en' ? 'Restore complete. Reloading page.' : '復元が完了しました。ページをリロードします。');
                     window.location.reload();
-                } catch (err) {
+                } catch (err: any) {
                     console.error(err);
-                    alert(language === 'en' ? 'Failed to restore settings.' : '復元に失敗しました。');
+                    alert((language === 'en' ? 'Failed to restore settings: ' : '復元に失敗しました: ') + (err.message || ''));
                 }
             };
             reader.readAsText(file);
@@ -207,6 +222,7 @@ export default function SettingsTab() {
         if (confirm(language === 'en' ? 'Are you sure you want to delete all data (AFs, Criteria, Memos)? This cannot be undone.' : 'すべての登録データ（AF、条件、メモ）を削除しますか？この操作は取り消せません。')) {
             await db.artifacts.clear();
             await db.conditions.clear();
+            await db.groups.clear();
             await db.memos.clear();
             alert(language === 'en' ? 'Data cleared.' : 'データをクリアしました。');
             window.location.reload();
@@ -231,6 +247,7 @@ export default function SettingsTab() {
     const handleClearConditionsOnly = async () => {
         if (confirm(language === 'en' ? 'Are you sure you want to delete ONLY Criteria Data? (AFs and Memos will remain)' : '確保AF条件のみを削除しますか？（AF・メモは残ります）')) {
             await db.conditions.clear();
+            await db.groups.clear();
             alert(language === 'en' ? 'Criteria data deleted.' : '確保AF条件を削除しました。');
         }
     };
