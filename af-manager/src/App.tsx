@@ -1,6 +1,7 @@
 import { useEffect, useRef, useLayoutEffect } from 'react';
 import { HashRouter, NavLink, useNavigate, useLocation, Navigate } from 'react-router-dom';
-import { Database, List, Grid, Filter, Settings as SettingsIcon, ShieldCheck, Trash2, BookOpen, ZoomIn, ZoomOut } from 'lucide-react';
+import { Database, List, Grid, Filter, Settings as SettingsIcon, ShieldCheck, Trash2, BookOpen, Library, ZoomIn, ZoomOut, Check, Info, AlertCircle } from 'lucide-react';
+import type { ToastItem } from './store/useAppStore';
 import { useLiveQuery } from 'dexie-react-hooks';
 
 import DataTab from './tabs/DataTab';
@@ -9,6 +10,7 @@ import GridTab from './tabs/GridTab';
 import CriteriaTab from './tabs/CriteriaTab';
 import SettingsTab from './tabs/SettingsTab';
 import HelpTab from './tabs/HelpTab';
+import ReferenceTab from './tabs/ReferenceTab';
 import { db } from './db';
 import { runCriteriaMatcher } from './utils/matcher';
 import { runDiscardCalc } from './utils/discardCalc';
@@ -38,26 +40,26 @@ async function handleKeepCalc(language: string) {
       db.artifacts.toArray(),
       db.conditions.toArray()
     ]);
-    if (conditions.length === 0) { alert(language === 'en' ? 'No criteria set.' : '条件が登録されていません。'); return; }
+    if (conditions.length === 0) { useAppStore.getState().showToast(language === 'en' ? 'No criteria set.' : '条件が登録されていません。', 'error'); return; }
     const updated = runCriteriaMatcher(artifacts, conditions);
     await db.artifacts.bulkPut(updated);
     const keptCount = updated.filter(a => a.keepFlag).length;
-    alert(language === 'en' ? `Calculation complete.\nKept: ${keptCount} item(s)` : `確保フラグの一括計算が完了しました。\n確保対象: ${keptCount}件`);
+    useAppStore.getState().showToast(language === 'en' ? `Calculation complete.\nKept: ${keptCount} item(s)` : `確保フラグの一括計算が完了しました。\n確保対象: ${keptCount}件`, 'success');
   } catch (e) {
     console.error(e);
-    alert(language === 'en' ? 'An error occurred.' : 'エラーが発生しました。');
+    useAppStore.getState().showToast(language === 'en' ? 'An error occurred.' : 'エラーが発生しました。', 'error');
   }
 }
 
 async function handleDiscardCalc(language: string) {
   try {
     const settings = await db.settings.get('global');
-    if (!settings) { alert(language === 'en' ? 'Settings not found.' : '設定が見つかりません。'); return; }
+    if (!settings) { useAppStore.getState().showToast(language === 'en' ? 'Settings not found.' : '設定が見つかりません。', 'error'); return; }
     const msg = await runDiscardCalc(settings, language);
-    alert(msg);
+    useAppStore.getState().showToast(msg, 'info');
   } catch (e) {
     console.error(e);
-    alert(language === 'en' ? 'An error occurred.' : 'エラーが発生しました。');
+    useAppStore.getState().showToast(language === 'en' ? 'An error occurred.' : 'エラーが発生しました。', 'error');
   }
 }
 
@@ -104,7 +106,7 @@ function AppInner() {
     root.style.setProperty('--font-size-sub', `${d.fontSizeSub}px`);
     root.style.setProperty('--font-family-main', d.fontFamilyMain || "'Inter', 'Segoe UI', system-ui, sans-serif");
     root.style.setProperty('--font-family-sub', d.fontFamilySub || "'Inter', 'Segoe UI', system-ui, sans-serif");
-    (document.body.style as any).zoom = String(d.zoom);
+    root.style.setProperty('--app-zoom', String(d.zoom));
     if (d.theme === 'light') {
       document.body.classList.add('theme-light');
     } else {
@@ -126,6 +128,13 @@ function AppInner() {
   };
 
   const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, to: string) => {
+    if (to === location.pathname) {
+      if (mainRef.current) {
+        mainRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+      return;
+    }
+
     if (!settingsDirty) return;
     e.preventDefault();
     if (confirm(language === 'en' ? 'There are unsaved changes in the Settings tab. Move without saving?' : '設定タブに未保存の変更があります。保存せずに移動しますか？')) {
@@ -209,47 +218,87 @@ function AppInner() {
             <BookOpen size={22} style={{ flexShrink: 0 }} />
             <span className="nav-text">{language === 'en' ? 'How to use' : '使い方'}</span>
           </NavLink>
+          <NavLink to="/reference" onClick={(e) => handleNavClick(e, '/reference')} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''} ${collapsed ? 'collapsed' : ''}`} title={language === 'en' ? 'Data' : 'データ'}>
+            <Library size={22} style={{ flexShrink: 0 }} />
+            <span className="nav-text">{language === 'en' ? 'Data' : 'データ'}</span>
+          </NavLink>
         </nav>
         {/* Quick Action Buttons */}
-        <div style={{ marginTop: 'auto', paddingTop: '2rem', display: 'flex', flexDirection: 'column', gap: '0.6rem', alignItems: collapsed ? 'center' : 'stretch' }}>
-          {!collapsed && <div style={{ fontSize: 'calc(var(--font-size-sub) * 0.87)', color: 'var(--text-muted)', marginBottom: '0.3rem', letterSpacing: '0.05em' }}>{language === 'en' ? 'Quick Calc' : 'クイック計算'}</div>}
+        <div style={{ marginTop: 'auto', paddingTop: '2rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
           <button
+            className="quick-calc-btn-keep"
             onClick={guardedKeepCalc}
             style={{
-              display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'flex-start', gap: '0.5rem',
-              padding: collapsed ? '0.6rem 0' : '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid rgba(59,130,246,0.4)',
-              background: 'rgba(59,130,246,0.1)', color: 'var(--accent-blue)', cursor: 'pointer',
-              fontSize: 'var(--font-size-sub)', fontWeight: 600, transition: 'all 0.2s', whiteSpace: 'nowrap',
-              width: collapsed ? '40px' : 'auto', height: collapsed ? '40px' : 'auto',
+              display: 'flex', alignItems: 'center', justifyContent: 'flex-start',
+              padding: '0 12px', borderRadius: '8px', cursor: 'pointer',
+              fontSize: 'var(--font-size-sub)', fontWeight: 600, transition: 'all 0.22s ease',
+              whiteSpace: 'nowrap', overflow: 'hidden',
+              width: '100%', height: '40px'
             }}
             title={language === 'en' ? 'Calculate Keep Flags' : '確保フラグを一括計算'}
           >
-            <ShieldCheck size={18} style={{ flexShrink: 0 }} /> {!collapsed && (language === 'en' ? 'Keep Flags' : '確保フラグ計算')}
+            <ShieldCheck size={18} style={{ flexShrink: 0 }} />
+            <span style={{
+              marginLeft: collapsed ? 0 : '0.4rem',
+              width: collapsed ? 0 : '100%',
+              opacity: collapsed ? 0 : 1,
+              transition: 'opacity 0.22s ease, width 0.22s ease, margin-left 0.22s ease',
+              overflow: 'hidden'
+            }}>
+              {language === 'en' ? 'Keep Flags' : '確保フラグ計算'}
+            </span>
           </button>
           <button
+            className="quick-calc-btn-discard"
             onClick={guardedDiscardCalc}
             style={{
-              display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'flex-start', gap: '0.5rem',
-              padding: collapsed ? '0.6rem 0' : '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.4)',
-              background: 'rgba(239,68,68,0.1)', color: 'var(--accent-danger)', cursor: 'pointer',
-              fontSize: 'var(--font-size-sub)', fontWeight: 600, transition: 'all 0.2s', whiteSpace: 'nowrap',
-              width: collapsed ? '40px' : 'auto', height: collapsed ? '40px' : 'auto',
+              display: 'flex', alignItems: 'center', justifyContent: 'flex-start',
+              padding: '0 12px', borderRadius: '8px', cursor: 'pointer',
+              fontSize: 'var(--font-size-sub)', fontWeight: 600, transition: 'all 0.22s ease',
+              whiteSpace: 'nowrap', overflow: 'hidden',
+              width: '100%', height: '40px'
             }}
             title={language === 'en' ? 'Calculate Discard Flags' : '廃棄フラグを一括計算'}
           >
-            <Trash2 size={18} style={{ flexShrink: 0 }} /> {!collapsed && (language === 'en' ? 'Discard Flags' : '廃棄フラグ計算')}
+            <Trash2 size={18} style={{ flexShrink: 0 }} />
+            <span style={{
+              marginLeft: collapsed ? 0 : '0.4rem',
+              width: collapsed ? 0 : '100%',
+              opacity: collapsed ? 0 : 1,
+              transition: 'opacity 0.22s ease, width 0.22s ease, margin-left 0.22s ease',
+              overflow: 'hidden'
+            }}>
+              {language === 'en' ? 'Discard Flags' : '廃棄フラグ計算'}
+            </span>
           </button>
         </div>
 
         {/* Version Display */}
-        {!collapsed && (
-          <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem', fontSize: '9px', color: 'var(--text-muted)', opacity: 0.7, letterSpacing: '0.05em' }}>
-            v{import.meta.env.VITE_APP_VERSION || '1.0.3'}
-          </div>
-        )}
+        <div style={{
+          display: 'flex', justifyContent: 'center',
+          marginTop: '1rem',
+          fontSize: '9px', color: 'var(--text-muted)',
+          letterSpacing: '0.05em', whiteSpace: 'nowrap', overflow: 'hidden',
+          opacity: collapsed ? 0 : 0.7, height: '12px',
+          transition: 'opacity 0.22s ease'
+        }}>
+          v{import.meta.env.VITE_APP_VERSION || '1.0.4'}
+        </div>
       </aside>
 
       <main className="main-content" ref={mainRef} onScroll={handleScroll} style={{ position: 'relative', overflowX: 'hidden' }}>
+        {/* Toast Overlay - Multi-stack */}
+        <div className="toast-container">
+          {useAppStore(state => state.toasts).map((toast: ToastItem) => (
+            <div key={toast.id} className={`toast-content ${toast.type}`}>
+              {toast.type === 'success' && <Check size={18} style={{ color: 'var(--accent-success)' }} />}
+              {toast.type === 'error' && <AlertCircle size={18} style={{ color: 'var(--accent-danger)' }} />}
+              {toast.type === 'info' && <Info size={18} style={{ color: 'var(--accent-blue)' }} />}
+              <span>{toast.message}</span>
+            </div>
+          ))}
+        </div>
+
         <TabZoomOverlay design={currentDesign} tabZoom={currentTabZoom} onAdjustZoom={handleAdjustTabZoom} />
         <div style={{ transform: `scale(${currentTabZoom})`, transformOrigin: 'top center', transition: 'transform 0.2s', minHeight: '100%' }}>
           {(location.pathname === '/' || location.pathname === '/data') && <Navigate to="/data" replace />}
@@ -261,6 +310,7 @@ function AppInner() {
               <div style={{ display: location.pathname === '/criteria' ? 'block' : 'none' }}><CriteriaTab /></div>
               <div style={{ display: location.pathname === '/settings' ? 'block' : 'none' }}><SettingsTab /></div>
               <div style={{ display: location.pathname === '/help' ? 'block' : 'none' }}><HelpTab /></div>
+              <div style={{ display: location.pathname === '/reference' ? 'block' : 'none' }}><ReferenceTab /></div>
             </>
           ) : (
             <>
@@ -270,6 +320,7 @@ function AppInner() {
               {location.pathname === '/criteria' && <CriteriaTab />}
               {location.pathname === '/settings' && <SettingsTab />}
               {location.pathname === '/help' && <HelpTab />}
+              {location.pathname === '/reference' && <ReferenceTab />}
             </>
           )}
         </div>

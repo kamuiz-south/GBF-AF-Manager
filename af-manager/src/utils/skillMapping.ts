@@ -82,3 +82,9 @@ export function reverseTranslateSkill(inputName: string | undefined, language: s
     if (language !== 'en') return inputName;
     return REVERSE_TRANSLATIONS[inputName] || inputName;
 }
+
+export function truncateSkill(name: string, language: string, max: number = 18) {
+    if (language !== 'ja') return name; // Don't truncate English for now
+    if (name.length <= max) return name;
+    return name.substring(0, max) + '...';
+}

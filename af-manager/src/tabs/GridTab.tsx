@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Heart, Package, Star, Trash2 } from 'lucide-react';
+import { AlertTriangle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Heart, Package, Star, Trash2, Unlock, User } from 'lucide-react';
 import { db } from '../db';
 import { useAppStore } from '../store/useAppStore';
 import { isRareArtifact } from '../utils/evaluator';
 import { useTranslation, type TranslationKey } from '../i18n';
+import { DEFAULT_DESIGN } from '../types';
 import { G1_SKILLS, G2_SKILLS, G3_SKILLS } from '../data/skillMaster';
+import WeaponIcon from '../components/WeaponIcon';
 
 const ATTR_TEXT_COLORS: Record<string, string> = {
     "1": "#ef4444", // Fire
@@ -85,6 +87,7 @@ export default function GridTab() {
 
     const settings = useLiveQuery(() => db.settings.get('global'));
     const noMaxHeight = settings?.design?.gridDetailNoMaxHeight;
+    const detailSkillNoWrap = settings?.design?.detailSkillNoWrap ?? false;
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', height: '100%', maxWidth: '850px', margin: '0 auto' }}>
@@ -124,25 +127,32 @@ export default function GridTab() {
                         </div>
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', flex: 1 }}>
-                            <SkillRow skill={selectedArtifact.skill1_info} group={1} />
-                            <SkillRow skill={selectedArtifact.skill2_info} group={1} />
-                            <SkillRow skill={selectedArtifact.skill3_info} group={2} />
-                            <SkillRow skill={selectedArtifact.skill4_info} group={3} />
+                            <SkillRow skill={selectedArtifact.skill1_info} group={1} noWrap={detailSkillNoWrap} theme={settings?.design?.theme || 'dark'} />
+                            <SkillRow skill={selectedArtifact.skill2_info} group={1} noWrap={detailSkillNoWrap} theme={settings?.design?.theme || 'dark'} />
+                            <SkillRow skill={selectedArtifact.skill3_info} group={2} noWrap={detailSkillNoWrap} theme={settings?.design?.theme || 'dark'} />
+                            <SkillRow skill={selectedArtifact.skill4_info} group={3} noWrap={detailSkillNoWrap} theme={settings?.design?.theme || 'dark'} />
 
-                            {/* Equipped Character display */}
-                            <div style={{ marginTop: '0.5rem', fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)' }}>
                                 {getEquippedCharacter(selectedArtifact, language)}
-                            </div>
 
                             {/* Keep condition title */}
-                            {selectedArtifact.keepFlag && (() => {
-                                const cond = conditions.find(c => c.id === selectedArtifact.keepFlag);
-                                return cond ? (
-                                    <div style={{ fontSize: 'var(--font-size-sub)', color: 'var(--accent-blue-hover)', display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.2rem' }}>
-                                        <span style={{ color: 'var(--accent-blue)', fontWeight: 600 }}>{language === 'en' ? '✓ Keep:' : '✓ 確保条件:'}</span>
-                                        <span>{cond.name || (language === 'en' ? '(No Name)' : '(名称なし)')}</span>
+                            {(() => {
+                                if (selectedArtifact.keepFlag) {
+                                    const cond = conditions.find((c: any) => c.id === selectedArtifact.keepFlag);
+                                    if (cond) {
+                                        return (
+                                            <div style={{ fontSize: 'var(--font-size-sub)', color: 'var(--accent-blue-hover)', display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.2rem' }}>
+                                                <span style={{ color: 'var(--accent-blue)', fontWeight: 600 }}>{language === 'en' ? '✓ Keep:' : '✓ 確保条件:'}</span>
+                                                <span>{cond.name || (language === 'en' ? '(No Name)' : '(名称なし)')}</span>
+                                            </div>
+                                        );
+                                    }
+                                }
+                                return (
+                                    <div style={{ fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)', opacity: 0.5, display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.2rem' }}>
+                                        <span style={{ fontWeight: 600 }}>{language === 'en' ? '- Keep:' : '- 確保条件:'}</span>
+                                        <span>{language === 'en' ? 'None' : '該当なし'}</span>
                                     </div>
-                                ) : null;
+                                );
                             })()}
 
                             {/* Memo field */}
@@ -153,7 +163,7 @@ export default function GridTab() {
                                     className="input"
                                     style={{ width: '100%', padding: '0.3rem 0.6rem', fontSize: 'var(--font-size-sub)' }}
                                     placeholder={language === 'en' ? 'Memo...' : 'メモ...'}
-                                    defaultValue={memos.find(m => m.id === selectedArtifact.id)?.memo || ''}
+                                    defaultValue={memos.find((m: any) => m.id === selectedArtifact.id)?.memo || ''}
                                     onBlur={e => updateMemo(selectedArtifact.id, e.target.value)}
                                 />
                             </div>
@@ -226,24 +236,49 @@ export default function GridTab() {
                         const isSelected = selectedArtifact?.id === item.id;
 
                         let statusColor = 'rgba(0,0,0,0.4)';
+                        let textColor = '#fff';
                         let statusText = `Lv${item.level}`;
 
+                        const colors = (settings?.design?.statusColors || DEFAULT_DESIGN.statusColors)!;
+
                         if (item.is_locked && item.discardFlag) {
-                            statusColor = '#d97706'; statusText = language === 'en' ? 'Discard?' : '廃棄？'; // amber conflict badge
+                            statusColor = colors.conflict.bg;
+                            textColor = colors.conflict.text === 'black' ? '#000' : '#fff';
+                            statusText = language === 'en' ? 'Discard?' : '廃棄？';
                         } else if (item.keepFlag && !item.is_locked) {
-                            statusColor = '#3b82f6'; statusText = 'Keep';
+                            statusColor = colors.keep.bg;
+                            textColor = colors.keep.text === 'black' ? '#000' : '#fff';
+                            statusText = 'Keep';
                         } else if (item.discardFlag && !item.is_unnecessary) {
-                            statusColor = '#ef4444'; statusText = language === 'en' ? 'Discard' : '廃棄';
+                            statusColor = colors.discard.bg;
+                            textColor = colors.discard.text === 'black' ? '#000' : '#fff';
+                            statusText = language === 'en' ? 'Discard' : '廃棄';
                         } else if (item.is_locked) {
-                            statusColor = '#fbbf24'; statusText = 'Fav';
+                            statusColor = colors.fav.bg;
+                            textColor = colors.fav.text === 'black' ? '#000' : '#fff';
+                            statusText = 'Fav';
                         } else if (item.is_unnecessary) {
-                            statusColor = '#8b5cf6'; statusText = 'Trash';
+                            statusColor = colors.trash.bg;
+                            textColor = colors.trash.text === 'black' ? '#000' : '#fff';
+                            statusText = 'Trash';
                         }
 
                         const isRare = isRareArtifact(item);
                         // equip_npc_info is [] when empty, or a plain object when equipped
                         const equipInfo = item.equip_npc_info;
                         const isEquipped = !Array.isArray(equipInfo);
+                        
+                        // お気に入りかつ確保フラグなしのマーク表示判定
+                        const hasMemo = memos.some((m: any) => m.id === item.id && m.memo.trim().length > 0);
+                        const showUnlockMark = settings?.design?.markFavoriteNoKeep && 
+                                               item.is_locked && 
+                                               !item.keepFlag && 
+                                               !(settings?.design?.hideFavoriteNoKeepIfMemo && hasMemo) &&
+                                               !(settings?.design?.hideFavoriteNoKeepIfEquipped && isEquipped) &&
+                                               !(settings?.design?.hideFavoriteNoKeepIfQuirky && isRare);
+
+                        const showConflictMark = item.keepFlag && item.is_unnecessary;
+
                         return (
                             <div
                                 key={item.id}
@@ -270,6 +305,40 @@ export default function GridTab() {
                                     zIndex: isSelected ? 10 : 1
                                 }}
                             >
+                                {/* Unlock warning mark — top-right offset */}
+                                {showUnlockMark && (
+                                    <div style={{
+                                        position: 'absolute',
+                                        top: '6px', right: '6px',
+                                        width: '20px', height: '20px',
+                                        background: 'var(--panel-bg)',
+                                        color: '#f97316',
+                                        borderRadius: '4px',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        zIndex: 3,
+                                        boxShadow: '0 0 4px rgba(0,0,0,0.5)'
+                                    }} title={language === 'en' ? 'Favorite but not kept' : 'お気に入り済みですが確保条件から外れています'}>
+                                        <Unlock size={14} />
+                                    </div>
+                                )}
+
+                                {/* Conflict warning mark (Keep Flag vs In-game Trash) — top-right offset */}
+                                {showConflictMark && (
+                                    <div style={{
+                                        position: 'absolute',
+                                        top: '6px', right: '6px',
+                                        width: '20px', height: '20px',
+                                        background: 'var(--panel-bg)',
+                                        color: '#ef4444',
+                                        borderRadius: '4px',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        zIndex: 3,
+                                        boxShadow: '0 0 4px rgba(0,0,0,0.5)'
+                                    }} title={language === 'en' ? 'Marked as Trash in-game but matches Keep criteria' : 'ゲーム内で不用品設定されていますが、確保条件に合致しています'}>
+                                        <AlertTriangle size={14} />
+                                    </div>
+                                )}
+
                                 {/* 装備中 badge — top-left */}
                                 {isEquipped && (
                                     <div style={{
@@ -296,18 +365,34 @@ export default function GridTab() {
                                     fontSize: settings?.design?.gridWeaponFontSize
                                         ? `${settings.design.gridWeaponFontSize}px`
                                         : (language === 'en' ? 'calc(var(--font-size-main) * 1.0)' : 'calc(var(--font-size-main) * 1.4)'),
-                                    textShadow: 'var(--weapon-text-shadow)'
+                                    textShadow: settings?.design?.useWeaponIcons ? 'none' : 'var(--weapon-text-shadow)'
                                 }}>
-                                    {language === 'en'
-                                        ? t(`WPN_${item.kind}` as TranslationKey).slice(0, 3)
-                                        : t(`WPN_${item.kind}` as TranslationKey)?.[0] || '?'}
+                                    {settings?.design?.useWeaponIcons ? (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '1px', justifyContent: 'center' }}>
+                                            <WeaponIcon 
+                                                kind={item.kind} 
+                                                size={Math.round((settings.design.gridWeaponFontSize ?? 19) * 1.3)} 
+                                            />
+                                            {settings?.design?.useWeaponIconsWithText && (
+                                                <span>
+                                                    {language === 'en'
+                                                        ? t(`WPN_${item.kind}` as TranslationKey).slice(0, 3)
+                                                        : t(`WPN_${item.kind}` as TranslationKey)?.[0] || '?'}
+                                                </span>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        language === 'en'
+                                            ? t(`WPN_${item.kind}` as TranslationKey).slice(0, 3)
+                                            : t(`WPN_${item.kind}` as TranslationKey)?.[0] || '?'
+                                    )}
                                 </div>
 
                                 <div style={{
                                     position: 'absolute',
                                     bottom: 0, left: 0, right: 0,
                                     background: statusColor,
-                                    color: (statusColor === '#fbbf24') ? '#000' : '#fff',
+                                    color: textColor,
                                     fontSize: 'calc(var(--font-size-sub) * 0.94)',
                                     textAlign: 'center',
                                     fontWeight: 600,
@@ -380,52 +465,88 @@ export default function GridTab() {
 
 function getEquippedCharacter(artifact: any, language: string) {
     const info = artifact.equip_npc_info;
-    const prefix = language === 'en' ? 'Equipped By: ' : '装備キャラ: ';
+    const prefixLabel = language === 'en' ? 'Equipped By:' : '装備キャラ:';
     const noneText = language === 'en' ? 'None' : 'なし';
     const unknownText = language === 'en' ? '(Unknown)' : '(名前不明)';
 
-    if (!info) return prefix + noneText;
+    let displayValue = noneText;
+    let isEquipped = false;
 
-    // Case 1: object form {user_npc_id, name, image} — equipped
-    if (!Array.isArray(info) && typeof info === 'object' && info.user_npc_id) {
-        return `${prefix}${info.name || unknownText}`;
+    if (info) {
+        if (!Array.isArray(info) && typeof info === 'object' && info.user_npc_id) {
+            displayValue = info.name || unknownText;
+            isEquipped = true;
+        } else if (Array.isArray(info) && info.length > 0) {
+            displayValue = info[0]?.name || unknownText;
+            isEquipped = true;
+        }
     }
 
-    // Case 2: non-empty array — equipped (legacy or future format)
-    if (Array.isArray(info) && info.length > 0) {
-        const npc = info[0];
-        return `${prefix}${npc?.name || unknownText}`;
+    if (isEquipped) {
+        return (
+            <div style={{ fontSize: 'var(--font-size-sub)', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.5rem' }}>
+                <span style={{ color: 'var(--accent-blue-hover)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <User size={13} /> {prefixLabel}
+                </span>
+                <span>{displayValue}</span>
+            </div>
+        );
     }
 
-    // Case 3: empty array [] — not equipped
-    return prefix + noneText;
+    return (
+        <div style={{ fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)', opacity: 0.5, display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.5rem' }}>
+            <span style={{ fontWeight: 600 }}>- {prefixLabel}</span>
+            <span>{displayValue}</span>
+        </div>
+    );
 }
 
-function SkillRow({ skill, group }: { skill?: any; group: 1 | 2 | 3 }) {
+function SkillRow({ skill, group, noWrap, theme }: { skill?: any; group: 1 | 2 | 3, noWrap?: boolean, theme?: string }) {
     if (!skill || !skill.name) return <div style={{ background: 'rgba(0,0,0,0.1)', borderRadius: '8px', padding: '0.6rem 0.8rem', display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}>-</div>;
 
     const isMax = skill.skill_quality === 5;
-    const maxColor = 'var(--accent-purple)';
+    const isDark = theme === 'dark';
+    const maxColor = isDark ? '#E3B7FF' : '#5D158A';
+    const borderCol = isDark ? '#5D158A' : '#E3B7FF';
+    const outlineStyle = `0px 0px 3px ${borderCol}, -1px -1px 0 ${borderCol}, 1px -1px 0 ${borderCol}, -1px 1px 0 ${borderCol}, 1px 1px 0 ${borderCol}`;
     const groupLabel = group === 1 ? '[Ⅰ]' : group === 2 ? '[Ⅱ]' : '[Ⅲ]';
     const groupColor = 'var(--accent-success)'; // teal/green equivalent
 
     return (
         <div style={{ background: 'var(--criteria-detail-bg)', padding: '0.5rem 0.8rem', borderRadius: '8px', border: '1px solid var(--dim-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: 0 }}>
-                <span style={{ color: isMax ? maxColor : 'var(--accent-gold)', fontWeight: isMax ? 'bold' : 600, minWidth: '36px', flexShrink: 0 }}>
+                <span style={{ 
+                    color: isMax ? maxColor : 'var(--accent-gold)', 
+                    fontWeight: 500, 
+                    minWidth: '36px', 
+                    flexShrink: 0,
+                    textShadow: isMax ? outlineStyle : 'none'
+                }}>
                     ★{skill.skill_quality}
                 </span>
-                <span style={{ color: 'var(--text-main)', fontSize: 'calc(var(--font-size-sub) * 0.94)', minWidth: '36px', flexShrink: 0 }}>
+                <span style={{ 
+                    color: 'var(--text-main)', 
+                    fontSize: 'calc(var(--font-size-sub) * 0.94)', 
+                    minWidth: '36px', 
+                    flexShrink: 0 
+                }}>
                     Lv{skill.level}
                 </span>
                 <span style={{ color: groupColor, fontSize: 'var(--font-size-sub)', fontWeight: 600, minWidth: '30px', flexShrink: 0 }}>
                     {groupLabel}
                 </span>
-                <span style={{ fontSize: 'var(--font-size-main)', color: 'var(--text-main)', wordBreak: 'break-all', lineHeight: '1.4', minWidth: 0 }}>
+                <span style={{ fontSize: 'var(--font-size-main)', color: 'var(--text-main)', wordBreak: 'break-all', whiteSpace: noWrap ? 'nowrap' : 'normal', overflow: noWrap ? 'hidden' : 'visible', textOverflow: noWrap ? 'ellipsis' : 'clip', lineHeight: '1.4', minWidth: 0 }}>
                     {skill.name}
                 </span>
             </div>
-            <span style={{ color: isMax ? maxColor : 'var(--accent-blue-hover)', fontSize: 'var(--font-size-sub)', fontWeight: 500, marginLeft: '0.8rem', flexShrink: 0 }}>
+            <span style={{ 
+                color: isMax ? maxColor : 'var(--accent-blue-hover)', 
+                fontSize: 'var(--font-size-sub)', 
+                fontWeight: 600, 
+                marginLeft: '0.8rem', 
+                flexShrink: 0,
+                textShadow: isMax ? outlineStyle : 'none'
+            }}>
                 {skill.effect_value}
             </span>
         </div>

@@ -14,7 +14,7 @@ export const ja = {
     "MESSAGE_ALL_DATA_CLEARED": "全てのAFデータを削除しました。",
 
     // Tabs
-    "TAB_DATA": "データ管理",
+    "TAB_DATA": "AFデータ取得",
     "DATA_TITLE": "所持AFのデータ取り込み",
     "TAB_LIST": "所持AFリスト",
     "TAB_GRID": "ゲーム内UI",

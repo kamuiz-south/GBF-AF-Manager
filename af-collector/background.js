@@ -10,6 +10,7 @@ let state = {
     received: new Map(),   // page -> responseData
     filterWarning: false,  // フィルターあり警告中フラグ
     filterChecked: false,  // 初回フィルターチェック済みフラグ（以降は再チェックしない）
+    lastFilter: null,      // 警告時のフィルター情報を保持（デバッグ用）
 };
 
 // ---------- ユーティリティ ----------
@@ -21,6 +22,7 @@ function getProgress() {
         receivedPages: [...state.received.keys()].sort((a, b) => a - b),
         complete: state.total !== null && state.received.size >= state.total,
         filterWarning: state.filterWarning,
+        lastFilter: state.lastFilter,
     };
 }
 
@@ -36,16 +38,51 @@ function broadcastProgress() {
     });
 }
 
-function resetState() {
+async function resetState() {
     state = {
         collecting: false,
         total: null,
         received: new Map(),
         filterWarning: false,
         filterChecked: false,
+        lastFilter: null,
     };
     chrome.action.setBadgeText({ text: '' });
+    await saveState();
 }
+
+// ---------- 永続化 ----------
+async function saveState() {
+    const data = {
+        collecting: state.collecting,
+        total: state.total,
+        received: Object.fromEntries(state.received),
+        filterWarning: state.filterWarning,
+        filterChecked: state.filterChecked,
+        lastFilter: state.lastFilter,
+    };
+    await chrome.storage.local.set({ af_state: data });
+}
+
+async function loadState() {
+    const res = await chrome.storage.local.get('af_state');
+    if (res.af_state) {
+        const s = res.af_state;
+        state.collecting = s.collecting;
+        state.total = s.total;
+        state.received = new Map(
+            Object.entries(s.received || {})
+                .map(([k, v]) => [parseInt(k, 10), v])
+        );
+        state.filterWarning = s.filterWarning;
+        state.filterChecked = s.filterChecked;
+        state.lastFilter = s.lastFilter;
+        broadcastProgress();
+    }
+}
+
+// 起動時に読み込み
+loadState();
 
 // ---------- 全タブへの収集ON/OFF通知 ----------
 async function notifyAllGBFTabs(collecting) {
@@ -65,16 +102,26 @@ function isFilterClear(filter) {
 
     for (const [key, expected] of Object.entries(STR_ZEROS)) {
         const v = filter[key];
-        if (v !== undefined && v !== expected) return false;
+        if (v !== undefined && v !== expected) {
+            console.warn(`[FilterCheck] Key ${key} mismatch: expected "${expected}", got "${v}"`);
+            return false;
+        }
     }
     for (const key of NUM_ZEROS) {
         const v = filter[key];
-        if (v !== undefined && v !== 0) return false;
+        // 数値の 0 または 文字列の "0" ならOKとみなす（GBFのAPIレスポンスの揺れに対応）
+        if (v !== undefined && v !== 0 && v !== '0') {
+            console.warn(`[FilterCheck] Key ${key} mismatch: expected 0 or "0", got ${v}`);
+            return false;
+        }
     }
     for (const key of EMPTY_ARR) {
         const v = filter[key];
         // undefined または空配列ならOK
-        if (v !== undefined && (!Array.isArray(v) || v.length !== 0)) return false;
+        if (v !== undefined && (!Array.isArray(v) || v.length !== 0)) {
+            console.warn(`[FilterCheck] Key ${key} mismatch: expected [], got ${JSON.stringify(v)}`);
+            return false;
+        }
     }
     return true;
 }
@@ -132,7 +179,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
                 if (!isFilterClear(filter)) {
                     // 压停せず、警告フラグのみを立てる
                     state.filterWarning = true;
-                    chrome.runtime.sendMessage({ type: 'FILTER_WARNING' }).catch(() => { });
+                    state.lastFilter = filter;
+                    chrome.runtime.sendMessage({ type: 'FILTER_WARNING', filterData: filter }).catch(() => { });
                     chrome.action.setBadgeText({ text: '!' });
                     chrome.action.setBadgeBackgroundColor({ color: '#f59e0b' });
                     // filterChecked は false のまま継続（次のクリーンレスポンスでリセットされる）
@@ -149,6 +197,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
             // 重複は上書き
             state.received.set(page, data);
+            saveState(); // 非同期で保存
             broadcastProgress();
 
             // 全ページ揃ったら完了処理
@@ -207,8 +256,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             state.received = new Map();
             state.filterWarning = false;
             state.filterChecked = false;
+            state.lastFilter = null;
             chrome.action.setBadgeText({ text: '…' });
             chrome.action.setBadgeBackgroundColor({ color: '#3b82f6' });
+            saveState();
             notifyAllGBFTabs(true);
             sendResponse({ ok: true });
             break;
@@ -216,6 +267,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
         case 'STOP_COLLECTING': {
             state.collecting = false;
+            saveState();
             notifyAllGBFTabs(false);
             broadcastProgress();
             break;
@@ -230,9 +282,11 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             // 「このまま続行」→ フィルターあり承認済みとして以後チェックしない
             state.filterWarning = false;
             state.filterChecked = true;   // ← 以後フィルターチェックをスキップ
+            state.lastFilter = null;
             state.collecting = true;
             chrome.action.setBadgeText({ text: '…' });
             chrome.action.setBadgeBackgroundColor({ color: '#3b82f6' });
+            saveState();
             notifyAllGBFTabs(true);
             broadcastProgress();          // ← popup を即座に更新
             break;

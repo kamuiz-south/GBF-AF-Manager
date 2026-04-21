@@ -88,6 +88,19 @@ export interface Condition {
   disabled?: boolean; // if true, this condition is excluded from keep-flag calculation
 }
 
+export interface FooterColorSetting {
+  bg: string;
+  text: 'white' | 'black';
+}
+
+export interface ArtifactStatusColors {
+  fav: FooterColorSetting;
+  trash: FooterColorSetting;
+  keep: FooterColorSetting;
+  discard: FooterColorSetting;
+  conflict: FooterColorSetting;
+}
+
 export interface ConditionGroup {
   id: string;      // uuid (条件の listId に対応)
   name: string;    // ユーザーが設定するグループ名
@@ -106,6 +119,21 @@ export interface AppDesignSettings {
   gridWeaponFontSize?: number;  // font size for weapon kind text in GridTab
   fontFamilyMain?: string;
   fontFamilySub?: string;
+  markFavoriteNoKeep?: boolean;     // Highlight locked AFs without keep flag
+  hideFavoriteNoKeepIfMemo?: boolean; // Don't highlight them if they have a memo
+  detailSkillNoWrap?: boolean;      // Detail view long skill names clipping
+  showCriteriaSkillBadge?: boolean; // Show target skill badge on condition cards (default true)
+  showCriteriaMethodBadge?: boolean; // Show method type badge on condition cards (default true)
+  hideFavoriteNoKeepIfEquipped?: boolean; // Don't highlight them if they are equipped
+  useLegacyM1Grid?: boolean; // Restore old UI for Method 1 quantity settings
+  swapCriteriaDetailGrid?: boolean; // Swap rows/cols in criteria detail table
+  dimCompletedCriteriaCells?: boolean; // Dim completed combinations
+  criteriaDetailTableThreshold: number; // How many items before switching to table view (default 5)
+  hideFavoriteNoKeepIfQuirky?: boolean; // Don't highlight them if they are Quirky (Rare)
+  useWeaponIcons?: boolean;          // Display weapon type as icon in grid
+  useWeaponIconsWithText?: boolean;  // Display weapon type as icon AND text in grid
+  useWeaponIconsInTables?: boolean;  // Display weapon type as icon in tables
+  statusColors?: ArtifactStatusColors; // Custom colors for grid footers
 }
 
 export const DEFAULT_DESIGN: AppDesignSettings = {
@@ -119,7 +147,48 @@ export const DEFAULT_DESIGN: AppDesignSettings = {
   enableTabPersistence: true,
   fontFamilyMain: "'Inter', 'Segoe UI', system-ui, sans-serif",
   fontFamilySub: "'Inter', 'Segoe UI', system-ui, sans-serif",
+  gridDetailNoMaxHeight: true,
+  detailSkillNoWrap: true,
+  markFavoriteNoKeep: true,
+  hideFavoriteNoKeepIfMemo: true,
+  hideFavoriteNoKeepIfEquipped: true,
+  showCriteriaSkillBadge: true,
+  showCriteriaMethodBadge: true,
+  swapCriteriaDetailGrid: false,
+  dimCompletedCriteriaCells: true,
+  useLegacyM1Grid: false,
+  criteriaDetailTableThreshold: 5,
+  useWeaponIcons: false,
+  useWeaponIconsWithText: false,
+  useWeaponIconsInTables: false,
+  hideFavoriteNoKeepIfQuirky: true,
+  statusColors: {
+    fav: { bg: '#fbbf24', text: 'black' },
+    trash: { bg: '#8b5cf6', text: 'white' },
+    keep: { bg: '#3b82f6', text: 'white' },
+    discard: { bg: '#ef4444', text: 'white' },
+    conflict: { bg: '#d97706', text: 'white' },
+  },
 };
+
+export interface ExceptionItem {
+  id?: string; // added for D&D stability
+  type?: 'item';
+  conditionGroup: number;
+  conditionSkillName: string | number;
+  targetGroup: number;
+  targetSkillName: string | number;
+  scoreModifier: number;
+  isSubtract?: boolean;
+}
+
+export interface ExceptionFolder {
+  id: string;
+  type: 'folder';
+  name: string;
+  isOpen: boolean;
+  children: ExceptionItem[];
+}
 
 export interface Settings {
   id: string; // 'global'
@@ -129,13 +198,8 @@ export interface Settings {
     group3Multiplier: number;
     skillMultipliers: Record<number, number>;
     qualityValues: Record<number, number>; // map quality level (1-5) to custom score value
-    exceptions: Array<{
-      conditionGroup: number;
-      conditionSkillName: string;
-      targetGroup: number;
-      targetSkillName: string;
-      scoreModifier: number;
-    }>;
+    exceptions: Array<ExceptionItem | ExceptionFolder>;
+    quirkyArtifactScores?: Record<number, number>; // map artifact_id to custom evaluation score
   };
   discardBehavior: {
     treatUnnecessaryAsDiscard: boolean;
@@ -152,4 +216,6 @@ export interface Settings {
   language?: 'ja' | 'en';      // UI language (default 'ja')
   pageLimit?: number;          // Stored user preference for list items per page
   lastImportedAt?: string;     // ISO timestamp of the most recent AF data import
+  notificationDuration?: number;   // Toast display duration in seconds (default: 3)
+  notificationMaxCount?: number;   // Max simultaneous toasts (default: 1)
 }

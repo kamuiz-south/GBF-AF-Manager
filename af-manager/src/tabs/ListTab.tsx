@@ -4,6 +4,7 @@ import { Search, ArrowUpDown, Heart, Package, Star, Trash2, ChevronLeft, Chevron
 import { db } from '../db';
 import type { AppArtifact } from '../types';
 import { useTranslation, type TranslationKey } from '../i18n';
+import { useAppStore } from '../store/useAppStore';
 
 export default function ListTab() {
     const { t, language } = useTranslation();
@@ -16,7 +17,7 @@ export default function ListTab() {
 
     // Pagination state
     const [currentPage, setCurrentPage] = useState(1);
-    const [pageSize, setPageSize] = useState(50);
+    const [pageSize, setPageSize] = useState(10);
 
     // Initial load for page size from db
     useEffect(() => {
@@ -108,6 +109,8 @@ export default function ListTab() {
         setCurrentPage(1);
     }, [searchTerm, filterAttr, filterKind, filterStatus, sortField, sortAsc, pageSize]);
 
+    const theme = useAppStore(state => state.globalSettings?.design?.theme) || 'dark';
+
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', height: '100%' }}>
 
@@ -150,11 +153,11 @@ export default function ListTab() {
                     value={filterStatus}
                     onChange={e => { setFilterStatus(e.target.value); setCurrentPage(1); }}>
                     <option value="">{language === 'en' ? 'Status: All' : '状態: すべて'}</option>
-                    <option value="fav">{language === 'en' ? 'Status: Fav' : '状態: お気に入り'}</option>
-                    <option value="trash">{language === 'en' ? 'Status: Trash' : '状態: 不用品'}</option>
-                    <option value="keep">{language === 'en' ? 'Status: Keep' : '状態: 確保提案'}</option>
-                    <option value="discard">{language === 'en' ? 'Status: Discard' : '状態: 廃棄提案'}</option>
-                    <option value="none">{language === 'en' ? 'Status: None' : '状態: ラベルなし'}</option>
+                    <option value="fav">{language === 'en' ? 'Favorite' : 'お気に入り'}</option>
+                    <option value="trash">{language === 'en' ? 'Trash' : '不用品'}</option>
+                    <option value="keep">{language === 'en' ? 'Keep' : '確保提案'}</option>
+                    <option value="discard">{language === 'en' ? 'Discard' : '廃棄提案'}</option>
+                    <option value="none">{language === 'en' ? 'None' : 'ラベルなし'}</option>
                 </select>
 
                 <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
@@ -180,6 +183,7 @@ export default function ListTab() {
                         <select className="input" style={{ padding: '0.3rem 1.5rem 0.3rem 0.6rem', fontSize: 'var(--font-size-sub)' }}
                             value={pageSize}
                             onChange={(e) => handlePageSizeChange(Number(e.target.value))}>
+                            <option value={5}>{language === 'en' ? '5 / page' : '5件 / ページ'}</option>
                             <option value={10}>{language === 'en' ? '10 / page' : '10件 / ページ'}</option>
                             <option value={50}>{language === 'en' ? '50 / page' : '50件 / ページ'}</option>
                             <option value={100}>{language === 'en' ? '100 / page' : '100件 / ページ'}</option>
@@ -215,7 +219,7 @@ export default function ListTab() {
                             <th style={thStyle}>{language === 'en' ? 'Skill 2' : 'スキル2'}</th>
                             <th style={thStyle}>{language === 'en' ? 'Skill 3' : 'スキル3'}</th>
                             <th style={thStyle}>{language === 'en' ? 'Skill 4' : 'スキル4'}</th>
-                            <th style={{ ...thStyle, minWidth: '100px' }}>{language === 'en' ? 'Status' : '状態'}</th>
+                            <th style={{ ...thStyle, minWidth: '130px' }}>{language === 'en' ? 'Status' : '状態'}</th>
                             <th style={thStyle} onClick={() => toggleSort('memoText')}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', cursor: 'pointer' }}>{language === 'en' ? 'Memo' : 'メモ'} <ArrowUpDown size={14} /></div>
                             </th>
@@ -235,21 +239,22 @@ export default function ListTab() {
                                 <td style={tdStyle}>
                                     <span style={{ color: 'var(--accent-gold)', fontWeight: 600 }}>{a.evaluationScore != null ? a.evaluationScore.toFixed(2) : '-'}</span>
                                 </td>
-                                <td style={tdStyle}><SkillCell skill={a.skill1_info} /></td>
-                                <td style={tdStyle}><SkillCell skill={a.skill2_info} /></td>
-                                <td style={tdStyle}><SkillCell skill={a.skill3_info} /></td>
-                                <td style={tdStyle}><SkillCell skill={a.skill4_info} /></td>
+                                <td style={tdStyle}><SkillCell skill={a.skill1_info} theme={theme} /></td>
+                                <td style={tdStyle}><SkillCell skill={a.skill2_info} theme={theme} /></td>
+                                <td style={tdStyle}><SkillCell skill={a.skill3_info} theme={theme} /></td>
+                                <td style={tdStyle}><SkillCell skill={a.skill4_info} theme={theme} /></td>
                                 <td style={tdStyle}>
-                                    <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', maxWidth: '140px' }}>
-                                        {a.is_locked && <span style={{ fontSize: 'calc(var(--font-size-sub) * 0.87)', background: 'var(--accent-gold)', color: '#000', padding: '2px 4px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '3px', fontWeight: 600 }}><Heart size={12} /> {language === 'en' ? 'Fav' : 'お気に入り'}</span>}
-                                        {a.is_unnecessary && <span style={{ fontSize: 'calc(var(--font-size-sub) * 0.87)', background: 'var(--accent-purple)', color: '#fff', padding: '2px 4px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '3px' }}><Package size={12} /> {language === 'en' ? 'Trash' : '不用品'}</span>}
-                                        {a.keepFlag && (
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                                <span style={{ fontSize: 'calc(var(--font-size-sub) * 0.87)', background: 'var(--accent-blue)', color: '#fff', padding: '2px 4px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '3px' }}><Star size={12} /> {language === 'en' ? 'Keep' : '確保提案'}</span>
-                                                {(() => { const cond = conditions.find(c => c.id === a.keepFlag); return cond ? <span style={{ fontSize: 'calc(var(--font-size-sub) * 0.87)', color: 'var(--accent-blue-hover)' }}>{cond.name || (language === 'en' ? '(No Name)' : '(名称なし)')}</span> : null; })()}
-                                            </div>
-                                        )}
-                                        {a.discardFlag && <span style={{ fontSize: 'calc(var(--font-size-sub) * 0.87)', background: 'var(--accent-danger)', color: '#fff', padding: '2px 4px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '3px' }}><Trash2 size={12} /> {language === 'en' ? 'Discard' : '廃棄提案'}</span>}
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', maxWidth: '160px' }}>
+                                        <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                                            {a.is_locked && <span style={{ fontSize: 'calc(var(--font-size-sub) * 0.87)', background: 'var(--accent-gold)', color: '#000', padding: '2px 4px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '3px', fontWeight: 600 }}><Heart size={12} /> {language === 'en' ? 'Fav' : 'お気に入り'}</span>}
+                                            {a.is_unnecessary && <span style={{ fontSize: 'calc(var(--font-size-sub) * 0.87)', background: 'var(--accent-purple)', color: '#fff', padding: '2px 4px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '3px' }}><Package size={12} /> {language === 'en' ? 'Trash' : '不用品'}</span>}
+                                            {a.keepFlag && <span style={{ fontSize: 'calc(var(--font-size-sub) * 0.87)', background: 'var(--accent-blue)', color: '#fff', padding: '2px 4px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '3px' }}><Star size={12} /> {language === 'en' ? 'Keep' : '確保提案'}</span>}
+                                            {a.discardFlag && <span style={{ fontSize: 'calc(var(--font-size-sub) * 0.87)', background: 'var(--accent-danger)', color: '#fff', padding: '2px 4px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '3px' }}><Trash2 size={12} /> {language === 'en' ? 'Discard' : '廃棄提案'}</span>}
+                                        </div>
+                                        {a.keepFlag && (() => {
+                                            const cond = conditions.find(c => c.id === a.keepFlag);
+                                            return cond ? <div style={{ fontSize: 'calc(var(--font-size-sub) * 0.87)', color: 'var(--accent-blue-hover)', wordBreak: 'break-word', lineHeight: 1.2 }}>{cond.name || (language === 'en' ? '(No Name)' : '(名称なし)')}</div> : null;
+                                        })()}
                                     </div>
                                 </td>
                                 <td style={tdStyle}>
@@ -269,7 +274,7 @@ export default function ListTab() {
                         {displayList.length === 0 && (
                             <tr>
                                 <td colSpan={9} style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                                    {language === 'en' ? 'No data. Please import JSON from the Data Tab.' : 'データがありません。データ取得タブからJSONをインポートしてください。'}
+                                    {language === 'en' ? 'No data. Please import JSON from the Data Tab.' : 'データがありません。AFデータ取得タブからJSONをインポートしてください。'}
                                 </td>
                             </tr>
                         )}
@@ -293,6 +298,7 @@ export default function ListTab() {
                         <select className="input" style={{ padding: '0.3rem 1.5rem 0.3rem 0.6rem', fontSize: 'var(--font-size-sub)' }}
                             value={pageSize}
                             onChange={(e) => handlePageSizeChange(Number(e.target.value))}>
+                            <option value={5}>5件 / ページ</option>
                             <option value={10}>10件 / ページ</option>
                             <option value={50}>50件 / ページ</option>
                             <option value={100}>100件 / ページ</option>
@@ -309,12 +315,17 @@ export default function ListTab() {
     );
 }
 
-function SkillCell({ skill }: { skill?: any }) {
+function SkillCell({ skill, theme }: { skill?: any, theme: string }) {
     if (!skill || !skill.name) return <span style={{ color: 'var(--text-muted)' }}>-</span>;
 
     // Check if the skill is quality 5 to apply special colored styling
     const isMax = skill.skill_quality === 5;
-    const maxColor = '#E3B7FF';
+    const isLevel5 = skill.level === 5;
+    const isDark = theme === 'dark';
+
+    const maxColor = isDark ? '#E3B7FF' : '#5D158A';
+    const borderCol = isDark ? '#5D158A' : '#E3B7FF';
+    const outlineStyle = `0px 0px 3px ${borderCol}, -1px -1px 0 ${borderCol}, 1px -1px 0 ${borderCol}, -1px 1px 0 ${borderCol}, 1px 1px 0 ${borderCol}`;
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxWidth: '160px' }}>
@@ -322,8 +333,24 @@ function SkillCell({ skill }: { skill?: any }) {
                 {skill.name}
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'calc(var(--font-size-sub) * 0.94)' }}>
-                <span style={{ color: isMax ? maxColor : 'var(--text-muted)' }}>{skill.effect_value || `- Lv.${skill.level}`}</span>
-                <span style={{ color: isMax ? maxColor : 'var(--accent-gold)', fontWeight: isMax ? 'bold' : 'normal' }}>★{skill.skill_quality}</span>
+                <span style={{ 
+                    color: isMax ? maxColor : 'var(--text-muted)',
+                    textShadow: isMax ? outlineStyle : 'none'
+                }}>{skill.effect_value || `- Lv.${skill.level}`}</span>
+                <span style={{ 
+                    color: isMax ? maxColor : 'var(--accent-gold)', 
+                    fontWeight: 500,
+                    textShadow: isMax ? outlineStyle : 'none'
+                }}>
+                    ★{skill.skill_quality}
+                    <span style={{ 
+                        color: isLevel5 ? maxColor : 'var(--text-muted)', 
+                        fontWeight: 500, 
+                        marginLeft: '4px', 
+                        fontSize: '0.9em',
+                        textShadow: isLevel5 ? outlineStyle : 'none'
+                    }}>Lv{skill.level}</span>
+                </span>
             </div>
         </div>
     );

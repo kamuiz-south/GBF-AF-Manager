@@ -15,6 +15,8 @@
   --accent-purple: #8b5cf6;
   --accent-danger: #ef4444;
   --accent-success: #10b981;
+  --max-quality-text: #E3B7FF;
+  --max-quality-outline: #5D158A;
   /* Font families are now set dynamically in App.tsx via --font-family-main and --font-family-sub */
   --glass-blur: blur(16px);
   --focus-ring: 0 0 0 2px rgba(59, 130, 246, 0.5);
@@ -26,13 +28,17 @@
   --grid-item-rare-bg: #29242F;
   --grid-item-rare-border: #5E4150;
   --grid-item-selected-bg: rgba(0, 0, 0, 0.4);
-  --criteria-card-bg: rgba(255, 255, 255, 0.02);
+  --criteria-card-bg: #141720;
+  --group-inner-bg: rgba(0, 0, 0, 0.25);
+  --group-inner-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.15);
   --criteria-detail-bg: rgba(0, 0, 0, 0.2);
   --dim-bg: rgba(255, 255, 255, 0.05);
   --dim-border: rgba(255, 255, 255, 0.1);
   --weapon-text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
   --criteria-new-bg: rgba(0, 0, 0, 0.3);
   --skill-name-color: #fff;
+  --zebra-even: rgba(255, 255, 255, 0.05);
+  --zebra-odd: transparent;
 }
 
 /* ── Light theme ───────────────────────────────── */
@@ -42,9 +48,9 @@
     radial-gradient(circle at 90% 80%, rgba(139, 92, 246, 0.07) 0%, transparent 40%);
   --panel-bg: rgba(255, 255, 255, 0.85);
   --panel-bg-hover: rgba(248, 250, 252, 0.95);
-  --panel-border: rgba(15, 23, 42, 0.12);
-  --text-main: #0f172a;
-  --text-muted: #475569;
+  --panel-border: rgba(0, 0, 0, 0.25);
+  --text-main: #000000;
+  --text-muted: #334155;
   --accent-blue: #2563eb;
   --accent-blue-hover: #1d4ed8;
   --accent-gold: #d97706;
@@ -55,18 +61,25 @@
   /* Darker red */
   --accent-success: #059669;
   /* Darker green */
+  --max-quality-text: #5D158A;
+  --max-quality-outline: #E3B7FF;
   --glass-blur: blur(16px);
   --focus-ring: 0 0 0 2px rgba(37, 99, 235, 0.4);
-  --dim-bg: rgba(0, 0, 0, 0.04);
-  --dim-border: rgba(0, 0, 0, 0.1);
-  --criteria-detail-bg: rgba(0, 0, 0, 0.04);
-  --grid-item-bg: rgba(0, 0, 0, 0.06);
+  --dim-bg: rgba(0, 0, 0, 0.06);
+  --dim-border: rgba(0, 0, 0, 0.22);
+  --criteria-card-bg: #ffffff;
+  --group-inner-bg: rgba(0, 0, 0, 0.03);
+  --group-inner-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.02);
+  --criteria-detail-bg: rgba(0, 0, 0, 0.08);
+  --grid-item-bg: rgba(0, 0, 0, 0.08);
   --grid-item-rare-bg: rgba(244, 114, 182, 0.12);
   --grid-item-rare-border: rgba(244, 114, 182, 0.6);
   --grid-item-selected-bg: #ffffff;
   --weapon-text-shadow: none;
   --criteria-new-bg: #ffffff;
   --skill-name-color: #000000;
+  --zebra-even: rgba(0, 0, 0, 0.04);
+  --zebra-odd: transparent;
 }
 
 .theme-light body,
@@ -86,15 +99,17 @@ body {
   background-color: var(--bg-color);
   background-image: var(--bg-gradient);
   color: var(--text-main);
-  min-height: 100vh;
-  overflow-x: hidden;
+  height: 100vh;
+  overflow: hidden;
   -webkit-font-smoothing: antialiased;
 }
 
 /* Layout Utilities */
 .app-container {
   display: flex;
-  height: 100vh;
+  height: calc(100vh / var(--app-zoom, 1));
+  width: 100%;
+  zoom: var(--app-zoom, 1);
   overflow: hidden;
 }
 
@@ -176,6 +191,34 @@ h5 {
   transform: translateY(-1px);
 }
 
+.btn-calc-glow {
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--accent-blue-hover);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  box-shadow: 0 0 15px rgba(59, 130, 246, 0.1);
+}
+
+.btn-calc-glow:hover {
+  background: rgba(59, 130, 246, 0.25);
+  border-color: rgba(59, 130, 246, 0.6);
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
+  transform: translateY(-1px);
+}
+
+.btn-calc-glow-purple {
+  background: rgba(139, 92, 246, 0.15);
+  color: #a78bfa;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  box-shadow: 0 0 15px rgba(139, 92, 246, 0.1);
+}
+
+.btn-calc-glow-purple:hover {
+  background: rgba(139, 92, 246, 0.25);
+  border-color: rgba(139, 92, 246, 0.6);
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.4);
+  transform: translateY(-1px);
+}
+
 .btn-ghost {
   background: transparent;
   color: var(--text-muted);
@@ -196,6 +239,31 @@ h5 {
   background: rgba(239, 68, 68, 0.2);
 }
 
+/* Sidebar Quick Calc Buttons */
+.quick-calc-btn-keep {
+  background: rgba(59,130,246,0.1);
+  border: 1px solid rgba(59,130,246,0.4);
+  color: var(--accent-blue);
+}
+.quick-calc-btn-keep:hover {
+  background: rgba(59,130,246,0.2);
+  border-color: rgba(59,130,246,0.6);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59,130,246,0.15);
+}
+
+.quick-calc-btn-discard {
+  background: rgba(239,68,68,0.1);
+  border: 1px solid rgba(239,68,68,0.4);
+  color: var(--accent-danger);
+}
+.quick-calc-btn-discard:hover {
+  background: rgba(239,68,68,0.2);
+  border-color: rgba(239,68,68,0.6);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(239,68,68,0.15);
+}
+
 /* Inputs and Forms */
 .input {
   width: 100%;
@@ -208,6 +276,15 @@ h5 {
   font-size: var(--font-size-main);
   transition: all 0.2s;
 }
+
+/* Muted select styling */
+.select-muted {
+  color: var(--text-muted);
+}
+.select-muted:focus {
+  color: var(--text-main);
+}
+
 
 /* Remove arrows from number inputs using the no-spinner class */
 .no-spinner::-webkit-outer-spin-button,
@@ -251,6 +328,13 @@ select.input option {
   color: #000000;
 }
 
+select.input optgroup {
+  background-color: var(--dim-bg);
+  color: var(--accent-blue);
+  font-weight: 700;
+  font-style: normal;
+}
+
 /* Navigation Links */
 .nav-link {
   display: flex;
@@ -282,15 +366,16 @@ select.input option {
 
 .nav-text {
   margin-left: 0.75rem;
-  transition: opacity 0.15s ease, width 0.2s ease, margin-left 0.2s ease;
+  transition: opacity 0.22s ease, max-width 0.22s ease, margin-left 0.22s ease;
   white-space: nowrap;
   overflow: hidden;
   opacity: 1;
+  max-width: 150px;
 }
 
 .nav-link.collapsed .nav-text {
   opacity: 0;
-  width: 0;
+  max-width: 0;
   margin-left: 0;
 }
 
@@ -342,3 +427,133 @@ select.input option {
 [style*="--font-size-sub"] {
   font-family: var(--font-family-sub);
 }
+
+/* Slanted headers for swapped criteria detail table */
+.slanted-th {
+  height: 50px;
+  vertical-align: bottom;
+  padding: 0 2px !important;
+  white-space: nowrap;
+}
+
+.slanted-th > div {
+  transform: rotate(-45deg);
+  transform-origin: left bottom;
+  width: 25px;
+  text-align: left;
+  margin-left: 5px;
+  font-size: 0.9em;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* Custom rounded dot-style checkbox */
+.dot-checkbox-container {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  user-select: none;
+  font-size: var(--font-size-main);
+  color: var(--text-main);
+}
+
+.dot-checkbox-container input {
+  display: none;
+}
+
+.dot-checkbox {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--panel-border);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  background: rgba(255,255,255,0.05);
+  flex-shrink: 0;
+}
+
+.dot-checkbox-container:hover .dot-checkbox {
+  border-color: var(--accent-gold);
+}
+
+.dot-checkbox-container input:checked + .dot-checkbox {
+  border-color: var(--accent-gold);
+}
+
+.dot-checkbox::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  background-color: var(--accent-gold);
+  border-radius: 50%;
+  transform: scale(0);
+  transition: transform 0.2s cubic-bezier(0.12, 0.4, 0.29, 1.46);
+}
+
+.dot-checkbox-container input:checked + .dot-checkbox::after {
+  transform: scale(1);
+}
+
+/* Toast Notifications */
+@keyframes toastSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.toast-container {
+  position: sticky;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+.toast-content {
+  margin-top: 1.5rem;
+  animation: toastSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.8rem 1.5rem;
+  background: var(--panel-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--panel-border);
+  border-radius: 9999px;
+  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.5);
+  color: var(--text-main);
+  font-weight: 600;
+  font-size: calc(var(--font-size-main) * 1.05);
+  pointer-events: auto;
+  max-width: 560px;
+}
+
+/* 2枚目以降はマージントップ不要（gapで制御） */
+.toast-content + .toast-content {
+  margin-top: 0;
+}
+
+/* Subtle theme variations for toast */
+.theme-light .toast-content {
+  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.15);
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.toast-content.success { border-bottom: 2px solid var(--accent-success); }
+.toast-content.error { border-bottom: 2px solid var(--accent-danger); }
+.toast-content.info { border-bottom: 2px solid var(--accent-blue); }

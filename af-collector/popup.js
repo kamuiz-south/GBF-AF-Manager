@@ -99,18 +99,18 @@ function render(p) {
 chrome.runtime.sendMessage({ type: 'GET_PROGRESS' }, (p) => {
     if (p) {
         render(p);
-        if (p.filterWarning) showFilterWarning();
+        if (p.filterWarning) showFilterWarning(p.lastFilter);
     }
 });
 
 // ---------- リアルタイム更新 ----------
 chrome.runtime.onMessage.addListener((msg) => {
     if (msg.type === 'PROGRESS_UPDATE') render(msg.progress);
-    if (msg.type === 'FILTER_WARNING') showFilterWarning();
+    if (msg.type === 'FILTER_WARNING') showFilterWarning(msg.filterData);
 });
 
 // ---------- フィルター警告バナー ----------
-function showFilterWarning() {
+function showFilterWarning(filterData) {
     if (document.getElementById('filterWarnBanner')) return;
 
     const banner = document.createElement('div');
@@ -129,15 +129,44 @@ function showFilterWarning() {
         'gap:0.4rem',
     ].join(';');
 
+    let debugHtml = '';
+    if (filterData) {
+        debugHtml = `
+            <div style="margin-top:0.4rem; border-top:1px solid rgba(245,158,11,0.2); padding-top:0.4rem;">
+                <details>
+                    <summary style="cursor:pointer; font-size:0.75rem; color:#94a3b8; outline:none;">[Debug Data]</summary>
+                    <pre style="font-size:0.65rem; background:rgba(0,0,0,0.4); padding:0.4rem; border-radius:4px; overflow:auto; max-height:100px; margin:0.4rem 0; color:#e2e8f0; border:1px solid rgba(255,255,255,0.1);">${JSON.stringify(filterData, null, 2)}</pre>
+                    <button id="btnCopyDebug" style="font-size:0.65rem; background:#475569; border:none; color:white; padding:2px 8px; border-radius:4px; cursor:pointer; transition:all 0.2s;">Copy JSON</button>
+                </details>
+            </div>
+        `;
+    }
+
     banner.innerHTML = `
         <span style="flex-shrink:0">⚠️</span>
-        <span>
+        <span style="flex-grow:1">
             ${chrome.i18n.getMessage('filterWarnTitle')}<br>
             <span style="color:#94a3b8;font-size:0.78rem">${chrome.i18n.getMessage('filterWarnDesc')}</span>
+            ${debugHtml}
         </span>
     `;
 
     document.getElementById('statusBox').before(banner);
+
+    if (filterData) {
+        const btn = document.getElementById('btnCopyDebug');
+        btn?.addEventListener('click', () => {
+            navigator.clipboard.writeText(JSON.stringify(filterData, null, 2)).then(() => {
+                const oldText = btn.textContent;
+                btn.textContent = 'Copied!';
+                btn.style.background = '#10b981';
+                setTimeout(() => {
+                    btn.textContent = oldText;
+                    btn.style.background = '#475569';
+                }, 1000);
+            });
+        });
+    }
 }
 
 // ---------- ボタン操作 ----------

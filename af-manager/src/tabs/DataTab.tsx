@@ -6,6 +6,7 @@ import { parseArtifactData } from '../utils/parser';
 import { evaluateArtifact } from '../utils/evaluator';
 import type { Settings } from '../types';
 import { useTranslation } from '../i18n';
+import { useAppStore } from '../store/useAppStore';
 
 const DEFAULT_SETTINGS: Settings = {
     id: 'global',
@@ -15,6 +16,7 @@ const DEFAULT_SETTINGS: Settings = {
 
 export default function DataTab() {
     const { t, language } = useTranslation();
+    const showToast = useAppStore(state => state.showToast);
     const [jsonInput, setJsonInput] = useState('');
     const [status, setStatus] = useState<{ type: 'idle' | 'success' | 'error', message: string }>({ type: 'idle', message: '' });
     const [dragOver, setDragOver] = useState(false);
@@ -148,7 +150,7 @@ export default function DataTab() {
 
             if (json.settings || (json.conditions && !json.artifacts && !json.list && !json.af_collector)) {
                 // Settings or Conditions-only file detected -> definitely a backup file
-                alert(language === 'en' ? 'Error: This is a Backup or Criteria file.\nPlease import it from the "Settings" tab.' : 'エラー：これはバックアップデータ、または条件の復元用ファイルです。\n「設定」タブの画面から復元してください。');
+                showToast(language === 'en' ? 'Error: This is a Backup or Criteria file.\nPlease import it from the "Settings" tab.' : 'エラー：これはバックアップデータ、または条件の復元用ファイルです。\n「設定」タブの画面から復元してください。', 'error');
                 setStatus({ type: 'idle', message: '' });
                 return;
             }
@@ -182,7 +184,7 @@ export default function DataTab() {
     const onDragLeave = () => setDragOver(false);
 
     const clearData = async () => {
-        if (confirm(language === 'en' ? 'Are you sure you want to delete ALL AF data? This cannot be undone.' : '本当に全てのAFデータを削除しますか？この操作は元に戻せません。')) {
+        if (confirm(language === 'en' ? 'Are you sure you want to delete ALL AF data?' : '全ての所持AFデータを削除しますか？')) {
             await db.artifacts.clear();
             setStatus({ type: 'success', message: language === 'en' ? 'All AF data has been deleted.' : '全てのAFデータを削除しました。' });
         }
@@ -206,8 +208,8 @@ export default function DataTab() {
                         )}
                     </div>
                     {totalArtifacts > 0 && (
-                        <button className="btn btn-ghost" style={{ border: '1px solid var(--accent-danger)', color: 'var(--accent-danger)', padding: '0.4rem 0.8rem' }} onClick={clearData}>
-                            <Trash2 size={16} /> {language === 'en' ? 'Format DB' : '初期化'}
+                        <button className="btn btn-ghost" style={{ border: '1px solid var(--accent-danger)', color: 'var(--accent-danger)', padding: '0.4rem 0.8rem' }} onClick={clearData} title={language === 'en' ? 'Delete Data' : '所持AFデータを削除'}>
+                            <Trash2 size={16} />
                         </button>
                     )}
                 </div>

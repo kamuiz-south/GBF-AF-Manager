@@ -11,8 +11,8 @@ const Section = ({ title, icon, children }: { title: string; icon: React.ReactNo
 );
 
 const Step = ({ n, children }: { n: number; children: React.ReactNode }) => (
-    <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'flex-start', marginBottom: '0.7rem', fontSize: 'var(--font-size-main)', lineHeight: 1.6 }}>
-        <span style={{ minWidth: '1.6rem', height: '1.6rem', background: 'var(--accent-blue)', color: '#fff', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 'calc(var(--font-size-sub) * 0.97)', flexShrink: 0 }}>{n}</span>
+    <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'flex-start', marginBottom: '0.7rem', fontSize: 'var(--font-size-main)', lineHeight: 1.6 }}>
+        <span style={{ fontWeight: 800, color: 'var(--text-muted)', fontSize: 'calc(var(--font-size-main) * 1.05)', flexShrink: 0, marginTop: '-0.05rem', minWidth: '1.2rem', textAlign: 'right' }}>{n}.</span>
         <span style={{ color: 'var(--text-main)' }}>{children}</span>
     </div>
 );
@@ -38,28 +38,28 @@ export default function HelpTab() {
 
             {/* ── データ取得 ──────────── */}
             {/* ── データ取得 ──────────── */}
-            <Section title={language === 'en' ? 'Data Acquisition Tab' : 'データ取得タブ'} icon={<Database size={18} />}>
+            <Section title={language === 'en' ? 'Data Acquisition Tab' : 'AFデータ取得タブ'} icon={<Database size={18} />}>
                 <p style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-main)', marginBottom: '1rem', lineHeight: 1.6 }}>
                     {language === 'en' ? 'There are 3 ways to import game Artifact (AF) data into the app.' : 'ゲームのアーティファクト（AF）データをアプリに取り込む方法は3つあります。'}
                 </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    <div style={{ background: 'var(--dim-bg)', padding: '1rem', borderRadius: '8px', borderLeft: '3px solid var(--accent-blue)' }}>
+                    <div style={{ background: 'var(--dim-bg)', padding: '1rem', borderRadius: '8px' }}>
                         <div style={{ fontWeight: 700, marginBottom: '0.4rem' }}>{language === 'en' ? '① AF Collector Extension (Send Feature)' : '① AF Collector 拡張機能（送信機能）'}</div>
                         <Step n={1}>{language === 'en' ? 'Open Granblue Fantasy in your browser and go to the Artifact List screen.' : 'グランブルーファンタジーをブラウザで開き、アーティファクト一覧画面へ移動する'}</Step>
                         <Step n={2}>{language === 'en' ? 'Click the "Start Collection" button in AF Collector and manually navigate through all pages of the AF list.' : 'AF Collectorの「収集開始」ボタンを押し、手動でAFリストを全ページ移動する'}</Step>
                         <Step n={3}>{language === 'en' ? 'After collection is complete, click the send button in AF Collector.' : '収集完了後、AF Collectorの送信ボタンを押す'}</Step>
                         <Note>{language === 'en' ? 'Cannot send to a different browser. Use the same browser or the Desktop App version.' : '別ブラウザへは送信できません。同一ブラウザかデスクトップアプリ版をご使用ください。'}</Note>
                     </div>
-                    <div style={{ background: 'var(--dim-bg)', padding: '1rem', borderRadius: '8px', borderLeft: '3px solid var(--accent-gold)' }}>
+                    <div style={{ background: 'var(--dim-bg)', padding: '1rem', borderRadius: '8px' }}>
                         <div style={{ fontWeight: 700, marginBottom: '0.4rem' }}>{language === 'en' ? '② Drag & Drop File' : '② ファイルをドラッグ＆ドロップ'}</div>
                         <Step n={1}>{language === 'en' ? 'Save the JSON file using the "Download" button in AF Collector.' : 'AF Collectorの「ダウンロード」ボタンからJSONファイルを保存する'}</Step>
-                        <Step n={2}>{language === 'en' ? 'Drag and drop the file into the drop zone in the Data Acquisition tab.' : 'ファイルをデータ取得タブのドロップゾーンにドラッグ＆ドロップする'}</Step>
+                        <Step n={2}>{language === 'en' ? 'Drag and drop the file into the drop zone in the Data Acquisition tab.' : 'ファイルをAFデータ取得タブのドロップゾーンにドラッグ＆ドロップする'}</Step>
                     </div>
-                    <div style={{ background: 'var(--dim-bg)', padding: '1rem', borderRadius: '8px', borderLeft: '3px solid var(--accent-purple)' }}>
+                    <div style={{ background: 'var(--dim-bg)', padding: '1rem', borderRadius: '8px' }}>
                         <div style={{ fontWeight: 700, marginBottom: '0.4rem' }}>{language === 'en' ? '③ Paste from Developer Tools (Manual Import)' : '③ 開発者ツールから貼り付け（手動インポート）'}</div>
                         <Step n={1}>{language === 'en' ? 'Open the browser Developer Tools (F12) -> Network tab.' : 'ブラウザの開発者ツール（F12）→ネットワークタブを開く'}</Step>
                         <Step n={2}>{language === 'en' ? 'Copy the response JSON of the request to' : '<code>rest/artifact/list/1</code> へのリクエストのレスポンスJSONをコピー'} <code>rest/artifact/list/1</code></Step>
-                        <Step n={3}>{language === 'en' ? 'Paste it into the manual import field at the bottom of the Data Acquisition tab -> Click "Import JSON".' : 'データ取得タブ下部の手動インポート欄に貼り付け→「JSONを取り込む」を押す'}</Step>
+                        <Step n={3}>{language === 'en' ? 'Paste it into the manual import field at the bottom of the Data Acquisition tab -> Click "Import JSON".' : 'AFデータ取得タブ下部の手動インポート欄に貼り付け→「JSONを取り込む」を押す'}</Step>
                         <Step n={4}>{language === 'en' ? 'Repeat for page 2 and onwards (you can paste page by page or multiple pages together).' : '2ページ目以降も同様に繰り返す（1ページずつ、または複数ページをまとめて貼り付け可）'}</Step>
                         <Note>{language === 'en' ? 'Consecutive pages starting from page 1 can be imported together. You can also import single pages independently.' : '1ページ目から連続したページであれば、まとめてインポートできます。途中ページからでも単独で取り込み可能です。'}</Note>
                     </div>
@@ -173,14 +173,14 @@ export default function HelpTab() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem', fontSize: 'var(--font-size-main)', lineHeight: 1.7 }}>
                     <div>
                         <strong style={{ color: 'var(--text-main)' }}>{language === 'en' ? 'Evaluation Score Formula' : '評価スコア計算式'}</strong>
-                        <p style={{ color: 'var(--text-muted)' }}>{language === 'en' ? 'You can configure group coefficients for G1/G2/G3 skills, score values per quality level, individual skill multiplier coefficients, and adjustments for skill combinations. Clicking "Save Settings" recalculates the evaluation score of all AFs.' : 'G1/G2/G3スキルのグループ係数、品質レベル別評価値、スキル個別乗算係数、スキル組み合わせによる補正を設定できます。「設定を保存」で全AFの評価値が再計算されます。'}</p>
+                        <p style={{ color: 'var(--text-muted)' }}>{language === 'en' ? 'You can configure group coefficients for G1/G2/G3 skills, score values per quality level, individual skill multiplier coefficients, and adjustments for skill combinations. Clicking "Save Settings" recalculates the evaluation score of all AFs.' : 'G1/G2/G3スキルのグループ係数、品質係数、スキル基礎点、スキル組み合わせによる補正を設定できます。「設定を保存」で全AFの評価値が再計算されます。'}</p>
                     </div>
                     <div>
                         <strong style={{ color: 'var(--text-main)' }}>{language === 'en' ? 'Discard Flag Settings' : '廃棄フラグ設定'}</strong>
                         <p style={{ color: 'var(--text-muted)' }}>{language === 'en' ? 'Adjust criteria for discarding candidates (target inventory, various protection settings).' : '廃棄候補の基準（在庫目標数、各種保護設定）を調整します。'}</p>
                     </div>
                     <div>
-                        <strong style={{ color: 'var(--text-main)' }}>{language === 'en' ? 'Data Management / Export & Import' : 'データ管理 / エクスポート・インポート'}</strong>
+                        <strong style={{ color: 'var(--text-main)' }}>{language === 'en' ? 'Data Management / Export & Import' : 'AFデータ取得 / エクスポート・インポート'}</strong>
                         <p style={{ color: 'var(--text-muted)' }}>{language === 'en' ? 'You can backup all data, or selectively export/import only conditions, memos, and evaluation formulas. Be sure to export before clearing your browser cache.' : '全データのバックアップ、条件・メモ・評価計算式のみの書き出し/読み込みができます。ブラウザキャッシュクリア前には必ずエクスポートしてください。'}</p>
                     </div>
                     <div>
