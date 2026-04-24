@@ -106,6 +106,8 @@ export interface ConditionGroup {
   name: string;    // ユーザーが設定するグループ名
   color?: string;  // ラベル色（任意）
   order: number;   // 表示順
+  sentinelPriority?: number; // 空フォルダの仮想位置（条件カードのpriorityと同一空間で管理）
+  disabled?: boolean; // フォルダ全体の無効化状態（空フォルダ時に使用）
 }
 export interface AppDesignSettings {
   zoom: number;               // global zoom (0.7–1.5, default 1.0)

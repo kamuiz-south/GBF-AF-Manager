@@ -1,0 +1,273 @@
+{
+  "group1Multiplier": 1,
+  "group2Multiplier": 1,
+  "group3Multiplier": 1,
+  "skillMultipliers": {
+    "1011": 6,
+    "1021": 2,
+    "1031": 2,
+    "1041": 2,
+    "1051": 2,
+    "1061": 3,
+    "1081": 10,
+    "1111": 0,
+    "1131": 11,
+    "2011": 11,
+    "2021": 11,
+    "2031": 2,
+    "2041": 10,
+    "2071": 5,
+    "2091": 0,
+    "2101": 0,
+    "2111": 9.5,
+    "2121": 10,
+    "2131": 0,
+    "2141": 10,
+    "2151": 5,
+    "2161": 12,
+    "2171": 5,
+    "2191": 2,
+    "3031": 0,
+    "3032": 0,
+    "5004": 0,
+    "5005": 5,
+    "5006": 4,
+    "5007": 4,
+    "5008": 4,
+    "5010": 2,
+    "5011": 2,
+    "5012": 0,
+    "5013": 0,
+    "5014": 2,
+    "5015": 2,
+    "5016": 2,
+    "5017": 2,
+    "5018": 6,
+    "5019": 7,
+    "5020": 5,
+    "5021": 15,
+    "5022": 0,
+    "5024": 12,
+    "5025": 5,
+    "5026": 4,
+    "5027": 0,
+    "5028": 6,
+    "5029": 0
+  },
+  "qualityValues": {
+    "1": 1,
+    "2": 1.05,
+    "3": 1.1,
+    "4": 1.25,
+    "5": 1.5
+  },
+  "exceptions": [
+    {
+      "conditionGroup": 1,
+      "conditionSkillName": 1131,
+      "targetGroup": 1,
+      "targetSkillName": 1081,
+      "scoreModifier": 1,
+      "isSubtract": false,
+      "id": "5wqyv9a5p",
+      "type": "item"
+    },
+    {
+      "id": "3ek14cflh",
+      "type": "item",
+      "conditionGroup": 1,
+      "conditionSkillName": 1011,
+      "targetGroup": 1,
+      "targetSkillName": 1131,
+      "scoreModifier": 1.5,
+      "isSubtract": false
+    },
+    {
+      "conditionGroup": 1,
+      "conditionSkillName": 1081,
+      "targetGroup": 2,
+      "targetSkillName": 2121,
+      "scoreModifier": 1,
+      "isSubtract": false,
+      "id": "n3v25d0j4",
+      "type": "item"
+    },
+    {
+      "id": "w3d6hj5tx",
+      "type": "folder",
+      "name": "アビリティ上限(+)",
+      "isOpen": false,
+      "children": [
+        {
+          "conditionGroup": 2,
+          "conditionSkillName": 2021,
+          "targetGroup": 3,
+          "targetSkillName": 5006,
+          "scoreModifier": 0.5,
+          "isSubtract": false,
+          "id": "zltkz6npa",
+          "type": "item"
+        },
+        {
+          "conditionGroup": 2,
+          "conditionSkillName": 2021,
+          "targetGroup": 3,
+          "targetSkillName": 5007,
+          "scoreModifier": 0.5,
+          "isSubtract": false,
+          "id": "twysj1why",
+          "type": "item"
+        },
+        {
+          "conditionGroup": 2,
+          "conditionSkillName": 2171,
+          "targetGroup": 3,
+          "targetSkillName": 5006,
+          "scoreModifier": 0.5,
+          "isSubtract": false,
+          "id": "pxjnd4a5o",
+          "type": "item"
+        },
+        {
+          "conditionGroup": 2,
+          "conditionSkillName": 2171,
+          "targetGroup": 3,
+          "targetSkillName": 5007,
+          "scoreModifier": 0.5,
+          "isSubtract": false,
+          "id": "pqrc6y7nm",
+          "type": "item"
+        }
+      ]
+    },
+    {
+      "id": "bp20amrfi",
+      "type": "folder",
+      "name": "防御力-70%",
+      "isOpen": false,
+      "children": [
+        {
+          "conditionGroup": 1,
+          "conditionSkillName": 1021,
+          "targetGroup": 2,
+          "targetSkillName": 2151,
+          "scoreModifier": -3,
+          "isSubtract": true,
+          "id": "wpixfuafi",
+          "type": "item"
+        },
+        {
+          "conditionGroup": 1,
+          "conditionSkillName": 1091,
+          "targetGroup": 2,
+          "targetSkillName": 2151,
+          "scoreModifier": -3,
+          "isSubtract": true,
+          "id": "ccy9dmta9",
+          "type": "item"
+        },
+        {
+          "conditionGroup": 1,
+          "conditionSkillName": 1111,
+          "targetGroup": 2,
+          "targetSkillName": 2151,
+          "scoreModifier": -6,
+          "isSubtract": true,
+          "id": "mgpi9faj4",
+          "type": "item"
+        },
+        {
+          "conditionGroup": 1,
+          "conditionSkillName": 1141,
+          "targetGroup": 2,
+          "targetSkillName": 2151,
+          "scoreModifier": -3,
+          "isSubtract": true,
+          "id": "bzp09cpi1",
+          "type": "item"
+        },
+        {
+          "id": "exhwixqn7",
+          "type": "item",
+          "conditionGroup": 3,
+          "conditionSkillName": 5012,
+          "targetGroup": 2,
+          "targetSkillName": 2151,
+          "scoreModifier": -3,
+          "isSubtract": true
+        },
+        {
+          "conditionGroup": 3,
+          "conditionSkillName": 5022,
+          "targetGroup": 2,
+          "targetSkillName": 2151,
+          "scoreModifier": -4,
+          "isSubtract": true,
+          "id": "oiuqb6dh0",
+          "type": "item"
+        },
+        {
+          "conditionGroup": 3,
+          "conditionSkillName": 5023,
+          "targetGroup": 2,
+          "targetSkillName": 2151,
+          "scoreModifier": -4,
+          "isSubtract": true,
+          "id": "62vu6l70c",
+          "type": "item"
+        }
+      ]
+    },
+    {
+      "id": "gojo8l6bz",
+      "type": "folder",
+      "name": "戦闘不能時バフ",
+      "isOpen": false,
+      "children": [
+        {
+          "conditionGroup": 1,
+          "conditionSkillName": 1141,
+          "targetGroup": 3,
+          "targetSkillName": 5019,
+          "scoreModifier": -3,
+          "isSubtract": true,
+          "id": "f82su8ur2",
+          "type": "item"
+        },
+        {
+          "conditionGroup": 1,
+          "conditionSkillName": 1021,
+          "targetGroup": 3,
+          "targetSkillName": 5019,
+          "scoreModifier": -3,
+          "isSubtract": true,
+          "id": "weqyq350i",
+          "type": "item"
+        },
+        {
+          "conditionGroup": 1,
+          "conditionSkillName": 1091,
+          "targetGroup": 3,
+          "targetSkillName": 5019,
+          "scoreModifier": -3,
+          "isSubtract": true,
+          "id": "7je928bxb",
+          "type": "item"
+        },
+        {
+          "conditionGroup": 1,
+          "conditionSkillName": 1111,
+          "targetGroup": 3,
+          "targetSkillName": 5019,
+          "scoreModifier": -6,
+          "isSubtract": true,
+          "id": "4xh1vqdfk",
+          "type": "item"
+        }
+      ]
+    }
+  ],
+  "quirkyArtifactScores": {
+    "401110401": 20
+  }
+}

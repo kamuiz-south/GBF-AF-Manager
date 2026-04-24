@@ -31,6 +31,8 @@ export default function ListTab() {
     const memos = useLiveQuery(() => db.memos.toArray()) || [];
     const conditions = useLiveQuery(() => db.conditions.toArray()) || [];
 
+    const isLv5Search = /^(?:れべる|レベル|Level|Lv)\.?\s*[5５]$/i.test(searchTerm.trim());
+
     // Join memo data and sort/filter
     const displayList = artifacts
         .map(a => {
@@ -48,13 +50,19 @@ export default function ListTab() {
                 (filterStatus === 'none' && !a.is_locked && !a.is_unnecessary && !a.keepFlag && !a.discardFlag)
             ) &&
             (
-                String(a.id).includes(searchTerm) ||
-                a.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                a.memoText.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (a.skill1_info?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (a.skill2_info?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (a.skill3_info?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (a.skill4_info?.name || '').toLowerCase().includes(searchTerm.toLowerCase())
+                searchTerm === '' || (
+                    isLv5Search ? (
+                        [a.skill1_info?.level, a.skill2_info?.level, a.skill3_info?.level, a.skill4_info?.level].some(lvl => lvl === 5)
+                    ) : (
+                        String(a.id).includes(searchTerm) ||
+                        a.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        a.memoText.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        (a.skill1_info?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        (a.skill2_info?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        (a.skill3_info?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        (a.skill4_info?.name || '').toLowerCase().includes(searchTerm.toLowerCase())
+                    )
+                )
             )
         )
         .sort((a, b) => {

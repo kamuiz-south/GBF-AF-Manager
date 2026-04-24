@@ -73,7 +73,7 @@ export default function HelpTab() {
                     {language === 'en' ? 'View and manage imported AF data in a list format.' : '取り込んだAFデータを一覧で確認・管理します。'}
                 </p>
                 <ul style={{ fontSize: 'var(--font-size-main)', color: 'var(--text-muted)', lineHeight: 1.8, paddingLeft: '1.4rem', margin: 0 }}>
-                    <li><strong style={{ color: 'var(--text-main)' }}>{language === 'en' ? 'Filtering:' : '絞り込み:'}</strong> {language === 'en' ? 'Quickly find AFs using Element/Weapon Kind filters or keyword search.' : '属性や武器種フィルター、キーワード検索で目的のAFを素早く探せます。'}</li>
+                    <li><strong style={{ color: 'var(--text-main)' }}>{language === 'en' ? 'Filtering:' : '絞り込み:'}</strong> {language === 'en' ? 'Quickly find AFs using Element/Weapon Kind filters or keyword search. You can also search for "Lv5" or "Level 5" to find AFs with max-level skills.' : '属性や武器種フィルター、キーワード検索で目的のAFを素早く探せます。また、「Lv5」や「レベル5」と入力することで、いずれかのスキルがLv5のAFのみを抽出可能です。'}</li>
                     <li><strong style={{ color: 'var(--text-main)' }}>{language === 'en' ? 'Sorting:' : 'ソート:'}</strong> {language === 'en' ? 'Click on any column header to sort the list (e.g., by Evaluation Score, alphabetical order).' : '各列のヘッダーをクリックすることで、評価スコア順や文字順等に並べ替えられます。'}</li>
                     <li><strong style={{ color: 'var(--text-main)' }}>{language === 'en' ? 'Memo Function:' : 'メモ機能:'}</strong> {language === 'en' ? 'Enter and save personal notes on each row (changes are saved automatically).' : '各行には自分用のメモを入力・保存できます（内容は自動的に保存されます）。'}</li>
                 </ul>

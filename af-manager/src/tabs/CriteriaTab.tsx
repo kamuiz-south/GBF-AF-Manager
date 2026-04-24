@@ -135,6 +135,14 @@ export default function CriteriaTab() {
             }
         }
 
+        // Validate at least one skill is selected
+        const hasSkill = Object.values(skills).some(s => !!s);
+        if (!hasSkill) {
+            showToast(language === 'en' ? 'Please select at least one skill.' : 'スキルを1つ以上選択してください。', 'error');
+            return;
+        }
+
+
         // Validate skill priorities (must be unique 1-4)
         const priorities = [skillPriorities.skill1, skillPriorities.skill2, skillPriorities.skill3, skillPriorities.skill4].filter(p => p !== null) as number[];
         const uniquePriorities = new Set(priorities);
@@ -143,12 +151,30 @@ export default function CriteriaTab() {
             return;
         }
 
+        // 真の末尾位置を計算するためにDBから最新取得
+        const latestConds = await db.conditions.toArray();
+        const latestGroups = await db.groups.toArray() as ConditionGroup[];
+
+        let targetPriority: number;
+        let targetListId: string = 'default';
+
+        if (editingId) {
+            const existing = latestConds.find(c => c.id === editingId);
+            targetPriority = existing?.priority ?? latestConds.length;
+            targetListId = existing?.listId || 'default';
+        } else {
+            // 新規作成：全要素の中の最大値 + 1
+            const condMaxP = latestConds.length > 0 ? Math.max(...latestConds.map(c => c.priority)) : -1;
+            const groupMaxP = latestGroups.length > 0 ? Math.max(...latestGroups.map(g => g.sentinelPriority ?? -1)) : -1;
+            targetPriority = Math.max(condMaxP, groupMaxP) + 1;
+        }
+
         const newCond: Condition = {
             id: editingId || crypto.randomUUID(),
-            listId: editingId ? (conditions.find(c => c.id === editingId)?.listId || 'default') : 'default',
-            priority: editingId ? (conditions.find(c => c.id === editingId)?.priority ?? conditions.length) : conditions.length,
+            listId: targetListId,
+            priority: targetPriority,
             name: name || (methodType === 1 
-                ? (language === 'en' ? `Condition ${conditions.length + 1}` : `条件 ${conditions.length + 1}`) 
+                ? (language === 'en' ? `Condition ${latestConds.length + 1}` : `条件 ${latestConds.length + 1}`) 
                 : (language === 'en' ? `For ${effectiveCharacterName}` : `${effectiveCharacterName} 用`)),
             methodType,
             targetCount: methodType === 1 ? { ...method1Grid } : {},
@@ -167,6 +193,7 @@ export default function CriteriaTab() {
             memo: condMemo || undefined,
         };
         await db.conditions.put(newCond);
+
 
         setIsAdding(false);
         setEditingId(null);
@@ -278,33 +305,76 @@ export default function CriteriaTab() {
         }
     }, [rawConditions, rawGroups]);
 
+    // === 旧バージョンデータの後方互換マイグレーション ===
+    // 初回ロード時に g.order と sentinelPriority を正規化して新アーキテクチャと整合性を持たせる。
+    // マイグレーション済みかを localStorage で管理し、一度だけ実行する。
+    useEffect(() => {
+        if (rawConditions === undefined || rawGroups === undefined) return;
+        const MIGRATION_KEY = 'af-manager-group-order-migrated-v3';
+        if (localStorage.getItem(MIGRATION_KEY)) return;
+
+        (async () => {
+            const conds = await db.conditions.toArray();
+            const groupsFromDb = await db.groups.toArray() as ConditionGroup[];
+            if (groupsFromDb.length === 0) {
+                localStorage.setItem(MIGRATION_KEY, '1');
+                return;
+            }
+
+            // 旧仕様の並びを再現して一時的なブロックを作成
+            const groupedConds: Record<string, Condition[]> = {};
+            for (const g of groupsFromDb) {
+                groupedConds[g.id] = conds.filter(c => c.listId === g.id).sort((a, b) => a.priority - b.priority);
+            }
+
+            const maxPriority = conds.length > 0 ? Math.max(...conds.map(c => c.priority)) : 0;
+            const seenGroups = new Set(groupsFromDb.map(g => g.id));
+            const allBlocks: BlockType[] = [];
+
+            for (const g of groupsFromDb) {
+                const inGroup = groupedConds[g.id] || [];
+                const topP = inGroup.length > 0 ? inGroup[0].priority : (g.sentinelPriority ?? (maxPriority + 1000 + (g.order || 0)));
+                allBlocks.push({ type: 'group', id: g.id, group: g, conds: inGroup, topPriority: topP });
+            }
+            const ungrouped = conds.filter(c => !c.listId || c.listId === 'default' || (c.listId !== 'default' && !seenGroups.has(c.listId))).sort((a, b) => a.priority - b.priority);
+            for (const c of ungrouped) {
+                allBlocks.push({ type: 'ungrouped', id: c.id, conds: [c], topPriority: c.priority });
+            }
+            allBlocks.sort((a, b) => a.topPriority - b.topPriority);
+
+            await saveBlocksOrder(allBlocks);
+            localStorage.setItem(MIGRATION_KEY, '1');
+        })();
+    }, [rawConditions, rawGroups]);
+
+
 
     // === 新しいブロック順序管理ロジック ===
     type BlockType = { type: 'group'; id: string; group: ConditionGroup; conds: Condition[]; topPriority: number; }
         | { type: 'ungrouped'; id: string; conds: Condition[]; topPriority: number; };
 
-    const getBlocks = (): BlockType[] => {
-        const blocks: BlockType[] = [];
+    const computeBlocksFromData = (conds: Condition[], grps: ConditionGroup[]): BlockType[] => {
         const seenGroups = new Set<string>();
+        const allBlocks: BlockType[] = [];
 
-        // 1. 各グループのブロックを作る
-        for (const g of groups) {
-            const inGroup = conditions.filter(c => c.listId === g.id).sort((a, b) => a.priority - b.priority);
-            // グループが空の場合は仮想的に大きい優先度を設定（後に追加順等で並ぶ）
-            const topP = inGroup.length > 0 ? inGroup[0].priority : 99999 + g.order;
-            blocks.push({ type: 'group', id: g.id, group: g, conds: inGroup, topPriority: topP });
+        for (const g of grps) {
+            const inGroup = conds.filter(c => c.listId === g.id).sort((a, b) => a.priority - b.priority);
+            const topP = inGroup.length > 0 ? inGroup[0].priority : (g.sentinelPriority ?? Infinity);
+            allBlocks.push({ type: 'group', id: g.id, group: g, conds: inGroup, topPriority: topP });
             seenGroups.add(g.id);
         }
 
-        // 2. 未分類条件（および存在しないフォルダに所属している「迷子」の条件）のブロックを作る
-        const ungrouped = conditions.filter(c => !c.listId || c.listId === 'default' || (c.listId !== 'default' && !seenGroups.has(c.listId))).sort((a, b) => a.priority - b.priority);
+        const ungrouped = conds.filter(c => !c.listId || c.listId === 'default' || (c.listId !== 'default' && !seenGroups.has(c.listId))).sort((a, b) => a.priority - b.priority);
         for (const c of ungrouped) {
-            blocks.push({ type: 'ungrouped', id: c.id, conds: [c], topPriority: c.priority });
+            allBlocks.push({ type: 'ungrouped', id: c.id, conds: [c], topPriority: c.priority });
         }
 
-        // 3. 全体を topPriority 順にソート (これが画面上のトップレベルの並びとなる)
-        blocks.sort((a, b) => a.topPriority - b.topPriority);
-        return blocks;
+        allBlocks.sort((a, b) => a.topPriority - b.topPriority);
+        return allBlocks;
+    };
+
+    const getBlocks = (): BlockType[] => {
+        return computeBlocksFromData(conditions, groups);
     };
 
     const saveBlocksOrder = async (blocks: BlockType[]) => {
@@ -315,9 +385,13 @@ export default function CriteriaTab() {
 
         for (const b of blocks) {
             if (b.type === 'group') {
-                groupUpdates.push({ ...b.group, order: gOrder++ });
-                for (const c of b.conds) {
-                    condUpdates.push({ ...c, priority: p++, listId: b.id });
+                if (b.conds.length === 0) {
+                    groupUpdates.push({ ...b.group, order: gOrder++, sentinelPriority: p++ });
+                } else {
+                    groupUpdates.push({ ...b.group, order: gOrder++, sentinelPriority: undefined });
+                    for (const c of b.conds) {
+                        condUpdates.push({ ...c, priority: p++, listId: b.type === 'group' ? b.group.id : 'default' });
+                    }
                 }
             } else {
                 for (const c of b.conds) {
@@ -325,12 +399,21 @@ export default function CriteriaTab() {
                 }
             }
         }
-        if (condUpdates.length > 0) await db.conditions.bulkPut(condUpdates);
-        if (groupUpdates.length > 0) await db.groups.bulkPut(groupUpdates);
+        
+        // Dexie transaction を使ってフォルダと条件をアトミックに更新する
+        // これにより、フォルダが存在しない状態で条件だけが読み込まれる瞬間を防ぐ
+        await db.transaction('rw', db.conditions, db.groups, async () => {
+            if (groupUpdates.length > 0) await db.groups.bulkPut(groupUpdates);
+            if (condUpdates.length > 0) await db.conditions.bulkPut(condUpdates);
+        });
     };
 
+
     const moveBlock = async (blockIndex: number, delta: -1 | 1) => {
-        const blocks = getBlocks();
+        const conds = await db.conditions.toArray();
+        const grps = await db.groups.toArray() as ConditionGroup[];
+        const blocks = computeBlocksFromData(conds, grps);
+
         const target = blockIndex + delta;
         if (target < 0 || target >= blocks.length) return;
         const temp = blocks[blockIndex];
@@ -340,19 +423,69 @@ export default function CriteriaTab() {
     };
 
     const moveIntraGroup = async (groupId: string, condId: string, delta: -1 | 1) => {
-        const blocks = getBlocks();
-        const groupBlock = blocks.find(b => b.type === 'group' && b.id === groupId);
-        if (!groupBlock) return;
-        const conds = groupBlock.conds;
-        const idx = conds.findIndex(c => c.id === condId);
+        const conds = await db.conditions.toArray();
+        const grps = await db.groups.toArray() as ConditionGroup[];
+        const blocks = computeBlocksFromData(conds, grps);
+
+        const block = blocks.find(b => b.type === 'group' && b.id === groupId);
+        if (!block) return;
+        const idx = block.conds.findIndex(c => c.id === condId);
         if (idx === -1) return;
         const target = idx + delta;
-        if (target < 0 || target >= conds.length) return;
-        const temp = conds[idx];
-        conds[idx] = conds[target];
-        conds[target] = temp;
+        if (target < 0 || target >= block.conds.length) return;
+        const temp = block.conds[idx];
+        block.conds[idx] = block.conds[target];
+        block.conds[target] = temp;
         await saveBlocksOrder(blocks);
     };
+
+    const handleCopyGroup = async (originalGroup: ConditionGroup) => {
+        // 1. 現状のDBとブロック構造を把握
+        const conds = await db.conditions.toArray();
+        const grps = await db.groups.toArray() as ConditionGroup[];
+        const blocks = computeBlocksFromData(conds, grps);
+
+        // 2. コピー元ブロックの特定
+        const sourceIdx = blocks.findIndex(b => b.type === 'group' && b.id === originalGroup.id);
+        if (sourceIdx === -1) return;
+        const sourceBlock = blocks[sourceIdx];
+        if (sourceBlock.type !== 'group') return;
+
+        // 3. 新しいデータの生成（IDの紐付けを完全に独立させる）
+        const newGroupId = crypto.randomUUID();
+        // 暫定的な優先度（元フォルダの直後にくるように 0.1 を加算）
+        const offset = 0.1;
+
+        const newGroupObj: ConditionGroup = {
+            ...JSON.parse(JSON.stringify(sourceBlock.group)),
+            id: newGroupId,
+            name: `${sourceBlock.group.name}${language === 'en' ? ' (Copy)' : ' - コピー'}`,
+            sentinelPriority: (sourceBlock.topPriority ?? 0) + offset
+        };
+
+        const newConds: Condition[] = sourceBlock.conds.map(c => ({
+            ...JSON.parse(JSON.stringify(c)),
+            id: crypto.randomUUID(),
+            listId: newGroupId,
+            priority: (c.priority ?? 0) + offset
+        }));
+
+        // 4. トランザクションで先に「物理的なデータ」としてDBに確定させる
+        await db.transaction('rw', db.conditions, db.groups, async () => {
+            await db.groups.put(newGroupObj);
+            await db.conditions.bulkPut(newConds);
+        });
+
+        // 5. 保存完了後、正規化のために再度読み込み
+        // (computeBlocksFromData内のソートにより、暫定優先度に基づいた正しい配置が算出される)
+        const latestConds = await db.conditions.toArray();
+        const latestGrps = await db.groups.toArray() as ConditionGroup[];
+        const finalBlocks = computeBlocksFromData(latestConds, latestGrps);
+        
+        // 6. 最終的な連番(1, 2, 3...)を振り直して保存
+        await saveBlocksOrder(finalBlocks);
+    };
+
 
     const handleDelete = async (id: string) => {
         await db.conditions.delete(id);
@@ -423,7 +556,21 @@ export default function CriteriaTab() {
     const handleAddGroup = async () => {
         const trimmed = newGroupName.trim();
         if (!trimmed) return;
-        await db.groups.put({ id: crypto.randomUUID(), name: trimmed, order: groups.length });
+        
+        // 末尾に正しく追加されるよう、条件カードと他フォルダの両方を考慮して sentinelPriority を振る
+        const latestConds = await db.conditions.toArray();
+        const latestGroups = await db.groups.toArray() as ConditionGroup[];
+
+        const condMaxP = latestConds.length > 0 ? Math.max(...latestConds.map(c => c.priority)) : -1;
+        const groupMaxP = latestGroups.length > 0 ? Math.max(...latestGroups.map(g => g.sentinelPriority ?? -1)) : -1;
+        const trueMaxP = Math.max(condMaxP, groupMaxP);
+        
+        await db.groups.put({ 
+            id: crypto.randomUUID(), 
+            name: trimmed, 
+            order: latestGroups.length,
+            sentinelPriority: trueMaxP + 1 
+        });
         setNewGroupName('');
     };
 
@@ -445,9 +592,16 @@ export default function CriteriaTab() {
 
     const handleDeleteGroupOnly = async (group: ConditionGroup) => {
         const affected = conditions.filter(c => c.listId === group.id);
-        if (affected.length > 0) await db.conditions.bulkPut(affected.map(c => ({ ...c, listId: 'default' })));
+        if (affected.length > 0) {
+            await db.conditions.bulkPut(affected.map(c => ({ ...c, listId: 'default' })));
+        }
         await db.groups.delete(group.id);
         setDeletingGroupId(null);
+
+        // 削除後に順序を詰め直す
+        const conds = await db.conditions.toArray();
+        const grps = await db.groups.toArray() as ConditionGroup[];
+        await saveBlocksOrder(computeBlocksFromData(conds, grps));
     };
 
     const handleDeleteGroupAndConds = async (group: ConditionGroup) => {
@@ -463,19 +617,82 @@ export default function CriteriaTab() {
             }
             await db.groups.delete(group.id);
             setDeletingGroupId(null);
+
+            // 削除後に順序を詰め直す
+            const conds = await db.conditions.toArray();
+            const grps = await db.groups.toArray() as ConditionGroup[];
+            await saveBlocksOrder(computeBlocksFromData(conds, grps));
         }
     };
 
     const handleMoveConditionToGroup = async (cond: Condition, newListId: string) => {
-        await db.conditions.put({ ...cond, listId: newListId });
+        if (newListId === (cond.listId || 'default')) return; // 変化なし
+
+        // DBから最新データを取得してステート遅延を回避
+        const latestConds = await db.conditions.toArray();
+        const latestGroups = await db.groups.toArray() as ConditionGroup[];
+        const currentBlocks = computeBlocksFromData(latestConds, latestGroups);
+
+        // 1. 移動対象のカードを探して元のブロックから取り出す
+        let draggedCond: Condition | null = null;
+        let sourceBlockIdx = -1;
+        for (let i = 0; i < currentBlocks.length; i++) {
+            const b = currentBlocks[i];
+            const idx = b.conds.findIndex(cc => cc.id === cond.id);
+            if (idx !== -1) {
+                draggedCond = b.conds.splice(idx, 1)[0];
+                sourceBlockIdx = i;
+                break;
+            }
+        }
+        if (!draggedCond) return;
+
+        // 2. 移動先にセットする
+        if (newListId === 'default') {
+            // 未分類へ移動：元いた場所（フォルダ等）の「直後」に挿入する
+            draggedCond.listId = 'default';
+            currentBlocks.splice(sourceBlockIdx + 1, 0, {
+                type: 'ungrouped',
+                id: draggedCond.id,
+                conds: [draggedCond],
+                topPriority: 0 // saveBlocksOrderで再計算されるため仮値
+            });
+        } else {
+            // 特定のフォルダへ移動
+            const targetGroupBlock = currentBlocks.find(b => b.type === 'group' && b.id === newListId);
+            if (targetGroupBlock) {
+                draggedCond.listId = newListId;
+                targetGroupBlock.conds.push(draggedCond);
+            } else {
+                // 移動先フォルダがブロックリストに見当たらない（異常系）
+                draggedCond.listId = 'default';
+                currentBlocks.push({ type: 'ungrouped', id: draggedCond.id, conds: [draggedCond], topPriority: 0 });
+            }
+        }
+
+        // 3. 全ブロックの順序を確定させて保存
+        await saveBlocksOrder(currentBlocks);
     };
 
-    const handleToggleGroupDisabled = async (groupConds: Condition[]) => {
-        if (groupConds.length === 0) return;
-        const isAllDisabled = groupConds.every(c => c.disabled);
+
+
+    const handleToggleGroupDisabled = async (group: ConditionGroup, groupConds: Condition[]) => {
+        const isAllDisabled = groupConds.length > 0 
+            ? groupConds.every(c => c.disabled) 
+            : (group.disabled ?? false);
+
         const nextState = !isAllDisabled;
-        const updated = groupConds.map(c => ({ ...c, disabled: nextState }));
-        await db.conditions.bulkPut(updated);
+
+        await db.transaction('rw', db.conditions, db.groups, async () => {
+            // フォルダ自体のフラグを更新（空フォルダ時の状態保持のため）
+            await db.groups.put({ ...group, disabled: nextState });
+            
+            // 中身がある場合は全条件も同期させる
+            if (groupConds.length > 0) {
+                const updated = groupConds.map(c => ({ ...c, disabled: nextState }));
+                await db.conditions.bulkPut(updated);
+            }
+        });
     };
 
     const toggleGroupCollapse = (groupId: string) => {
@@ -964,13 +1181,11 @@ export default function CriteriaTab() {
 
                         const renderCondCard = (item: CondRenderItem) => {
                             const { cond: c, blockIndex, isIntraGroup, intraIndex, intraCount, displayNum, parentDisabled } = item;
-                            // No need to check collapsedGroups here, as the `items` array already filters them out
                             const isExpanded = expandedIds.has(c.id);
                             
                             const applyDimming = c.disabled && !parentDisabled;
 
                             return (
-                                // STEP3: ラッパーdiv – D&DイベントとpaddingBottomでgapを再現
                                 <div key={c.id}
                                     draggable={canDragItemId === c.id}
                                     onDragStart={(e) => {
@@ -997,21 +1212,17 @@ export default function CriteriaTab() {
                                         if (draggedId === c.id) {
                                             setDragOverPos(null);
                                         } else {
-                                            // STEP4.1: 無移動判定
                                             let isNoMove = false;
                                             if (draggedType === 'cond') {
                                                 const sourceBlock = blocks.find(b => b.conds.some(cc => cc.id === draggedId));
                                                 const targetBlock = blocks[blockIndex];
                                                 if (sourceBlock && targetBlock && sourceBlock.id === targetBlock.id) {
-                                                    // 同一グループ内
                                                     const sIdx = sourceBlock.conds.findIndex(cc => cc.id === draggedId);
                                                     if (pos === 'top' && intraIndex === sIdx + 1) isNoMove = true;
                                                     if (pos === 'bottom' && intraIndex === sIdx - 1) isNoMove = true;
                                                 } else {
-                                                    // グループ跨ぎ or トップレベル
                                                     const sBlockIdx = blocks.findIndex(b => b.id === draggedId);
                                                     if (sBlockIdx !== -1) {
-                                                        // ターゲットが独立したカード（非グループ内）の場合のみ、トップレベルでの隣接判定を適用
                                                         if (!isIntraGroup) {
                                                             if (pos === 'top' && blockIndex === sBlockIdx + 1) isNoMove = true;
                                                             if (pos === 'bottom' && blockIndex === sBlockIdx - 1) isNoMove = true;
@@ -1019,7 +1230,6 @@ export default function CriteriaTab() {
                                                     }
                                                 }
                                             } else if (draggedType === 'group') {
-                                                // グループを掴んでいる場合、他のグループの「中」や「条件カード間」には表示しない
                                                 if (isIntraGroup) {
                                                     isNoMove = true;
                                                 } else {
@@ -1034,7 +1244,6 @@ export default function CriteriaTab() {
                                         }
                                     }}
                                     onDragLeave={(e) => {
-                                        // 子要素への移動はleaveとして扱わない
                                         if (!e.currentTarget.contains(e.relatedTarget as Node)) {
                                             setDragOverId(null);
                                             setDragOverPos(null);
@@ -1050,7 +1259,9 @@ export default function CriteriaTab() {
 
                                         try {
                                             const data = JSON.parse(e.dataTransfer.getData('text/plain'));
-                                            const currentBlocks = getBlocks();
+                                            const conds = await db.conditions.toArray();
+                                            const grps = await db.groups.toArray() as ConditionGroup[];
+                                            const currentBlocks = computeBlocksFromData(conds, grps);
 
                                             if (data.type === 'cond') {
                                                 let draggedCond: Condition | null = null;
@@ -1086,7 +1297,6 @@ export default function CriteriaTab() {
                                         } catch (err) { console.error(err); }
                                     }}
                                     style={{ position: 'relative', paddingBottom: isIntraGroup ? '0.4rem' : '0.8rem' }}>
-                                    {/* ドロップインジケーター – ラッパー内にgap中央に表示 */}
                                     {dragOverId === c.id && dragOverPos && dragOverPos !== 'inside' && (
                                         <div style={{
                                             position: 'absolute',
@@ -1100,10 +1310,8 @@ export default function CriteriaTab() {
                                             borderRadius: '2px'
                                         }} />
                                     )}
-                                    {/* 実カード本体 */}
                                     <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', background: 'var(--criteria-card-bg)', padding: '0.8rem 1rem', borderRadius: '8px', border: '2px solid var(--panel-border)', transition: 'all 0.2s', opacity: applyDimming ? 0.45 : 1, filter: applyDimming ? 'grayscale(0.4)' : 'none' } as any}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: groups.length > 0 ? 'stretch' : 'flex-start' }}>
-                                        {/* Left: clickable info + group assignment */}
                                         <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
                                             <div style={{ cursor: 'pointer' }} onClick={() => toggleExpand(c.id)}>
                                                 <div style={{ fontWeight: 'bold', fontSize: 'var(--font-size-main)', marginBottom: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -1118,20 +1326,17 @@ export default function CriteriaTab() {
                                                         {c.methodType === 1 ? (language === 'en' ? 'Skill Oriented' : 'スキル指向') : (language === 'en' ? `Character Oriented: ${c.characterName}` : `キャラ指向：${c.characterName}`)}
                                                     </span>
                                                     )}
-                                                    {/* Skill badge: show highest-priority filled skill */}
                                                     {(() => {
                                                         const SKILL_KEYS = ['skill1', 'skill2', 'skill3', 'skill4'] as const;
                                                         if (!(currentDesign.showCriteriaSkillBadge ?? true)) return null;
                                                         const filledKeys = SKILL_KEYS.filter(k => c.skills[k]);
                                                         if (filledKeys.length === 0) return null;
-                                                        // 1. If any must-match skills exist, pick among them using S3>S4>S1>S2 order
                                                         const MUST_MATCH_ORDER: typeof SKILL_KEYS[number][] = ['skill3', 'skill4', 'skill1', 'skill2'];
                                                         const mustMatchKeys = filledKeys.filter(k => c.skillMustMatch[k]);
                                                         let topKey: typeof SKILL_KEYS[number];
                                                         if (mustMatchKeys.length > 0) {
                                                             topKey = MUST_MATCH_ORDER.find(k => mustMatchKeys.includes(k))!;
                                                         } else {
-                                                            // 2. Otherwise, fall back to ☆priority ascending sort
                                                             const sorted = [...filledKeys].sort((a, b) => (c.skillPriorities[a] ?? Infinity) - (c.skillPriorities[b] ?? Infinity));
                                                             topKey = sorted[0];
                                                         }
@@ -1149,7 +1354,6 @@ export default function CriteriaTab() {
                                                     )}
                                                 </div>
                                             </div>
-                                            {/* Group assignment dropdown — always at bottom of left column */}
                                             {groups.length > 0 && (
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: 'auto', paddingTop: '0.4rem' }} onClick={e => e.stopPropagation()}>
                                                     <span style={{ fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{language === 'en' ? 'Folder:' : 'フォルダ:'}</span>
@@ -1166,10 +1370,8 @@ export default function CriteriaTab() {
                                             )}
                                         </div>
 
-                                        {/* Right: 2-row action buttons */}
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', alignItems: 'flex-end', marginLeft: '0.8rem', flexShrink: 0 }}>
-                                            {/* Row 1: Disable | Copy | Edit */}
-                                            <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center', height: '32px', border: '1px solid transparent' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', alignItems: 'flex-end', marginLeft: '0.8rem', flexShrink: 0 }}>
+                                            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
                                                 {deletingId === c.id ? (
                                                     <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center', background: 'rgba(239, 68, 68, 0.1)', padding: '0 0.5rem', borderRadius: '6px', border: '1px solid rgba(239, 68, 68, 0.3)', height: '100%', boxSizing: 'border-box' }}>
                                                         <span style={{ fontSize: 'var(--font-size-sub)', color: 'var(--accent-danger)', fontWeight: 700, marginRight: '0.2rem' }}>{language === 'en' ? 'Delete?' : '削除?'}</span>
@@ -1188,15 +1390,16 @@ export default function CriteriaTab() {
                                                         <button className="btn btn-ghost" onClick={() => handleEdit(c)} style={{ padding: '0.4rem', fontSize: 'var(--font-size-sub)' }} title={language === 'en' ? 'Edit' : '再編集'}>
                                                             {language === 'en' ? 'Edit' : '編集'}
                                                         </button>
-                                                        <div style={{ width: '1px', background: 'var(--panel-border)', alignSelf: 'stretch' }} />
-                                                        <button className="btn btn-ghost" onClick={() => setDeletingId(c.id)} style={{ padding: '0.4rem', color: 'var(--accent-danger)', opacity: 0.7 }} title={language === 'en' ? 'Delete' : '削除'}>
-                                                            <Trash2 size={16} />
-                                                        </button>
+                                                        <div style={{ width: '1px', background: 'var(--panel-border)', alignSelf: 'stretch', margin: '0 0.1rem' }} />
+                                                        <div style={{ width: '32px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                                                            <button className="btn btn-ghost" onClick={() => setDeletingId(c.id)} style={{ padding: '0.4rem', color: 'var(--accent-danger)', opacity: 0.7 }} title={language === 'en' ? 'Delete' : '削除'}>
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        </div>
                                                     </>
                                                 )}
                                             </div>
-                                            {/* Row 2: Up | Down | Grip */}
-                                            <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+                                            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
                                                 {isIntraGroup ? (
                                                     <>
                                                         <button className="btn btn-ghost" onClick={() => moveIntraGroup(c.listId!, c.id, -1)} disabled={intraIndex === 0} style={{ padding: '0.4rem', opacity: intraIndex === 0 ? 0.3 : 1 }} title={language === 'en' ? 'Move Up (In Folder)' : 'フォルダ内で優先度を上げる'}>
@@ -1207,7 +1410,6 @@ export default function CriteriaTab() {
                                                         </button>
                                                     </>
                                                 ) : (
-                                                    // Ungrouped top-level move
                                                     <>
                                                         <button className="btn btn-ghost" onClick={() => moveBlock(blockIndex, -1)} disabled={blockIndex === 0} style={{ padding: '0.4rem', opacity: blockIndex === 0 ? 0.3 : 1 }} title={language === 'en' ? 'Move Block Up' : 'ブロックごと優先度を上げる'}>
                                                             <ChevronUp size={18} />
@@ -1217,21 +1419,22 @@ export default function CriteriaTab() {
                                                         </button>
                                                     </>
                                                 )}
-                                                <div style={{ width: '1px', background: 'var(--panel-border)', alignSelf: 'stretch' }} />
-                                                <div 
-                                                    style={{ padding: '0.4rem', color: 'var(--text-muted)', cursor: 'grab', opacity: 0.7, display: 'flex', alignItems: 'center' }} 
-                                                    title={language === 'en' ? 'Drag' : 'ドラッグ'}
-                                                    onMouseDown={() => setCanDragItemId(c.id)}
-                                                    onMouseUp={() => setCanDragItemId(null)}
-                                                    onMouseLeave={() => setCanDragItemId(null)}
-                                                >
-                                                    <GripVertical size={18} />
+                                                    <div style={{ width: '1px', background: 'var(--panel-border)', alignSelf: 'stretch', margin: '0 0.1rem' }} />
+                                                    <div style={{ width: '32px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                                                        <div 
+                                                            style={{ padding: '0.4rem', color: 'var(--text-muted)', cursor: 'grab', opacity: 0.7, display: 'flex', alignItems: 'center' }} 
+                                                            title={language === 'en' ? 'Drag' : 'ドラッグ'}
+                                                            onMouseDown={() => setCanDragItemId(c.id)}
+                                                            onMouseUp={() => setCanDragItemId(null)}
+                                                            onMouseLeave={() => setCanDragItemId(null)}
+                                                        >
+                                                            <GripVertical size={18} />
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                            </div>
                                         </div>
                                     </div>
 
-                                    {/* Expanded condition detail */}
                                     {isExpanded && (() => {
                                         const keptAFs = allArtifacts
                                             .filter(a => a.keepFlag === c.id)
@@ -1250,7 +1453,6 @@ export default function CriteriaTab() {
 
                                         return (
                                             <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px dashed var(--panel-border)', display: 'flex', gap: '1.5rem' }}>
-                                                {/* Left: condition details */}
                                                 <div style={{ flex: 1, fontSize: 'var(--font-size-main)', color: 'var(--text-main)', minWidth: 0 }}>
                                                     {c.methodType === 1 && (
                                                         <div style={{ marginBottom: '0.8rem' }}>
@@ -1258,7 +1460,6 @@ export default function CriteriaTab() {
                                                             {(() => {
                                                                 const entries = Object.entries(c.targetCount).filter(([, v]) => v > 0);
                                                                 if (entries.length < currentDesign.criteriaDetailTableThreshold) {
-                                                                    // Badge view for 4 or fewer
                                                                     return (
                                                                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.3rem' }}>
                                                                             {entries
@@ -1287,15 +1488,11 @@ export default function CriteriaTab() {
                                                                  {ATTRIBUTE_OPS.find(a => a.val === attr)?.label}{language === 'en' ? '' : '属性'}・{KIND_OPS.find(k => k.val === kind)?.label} ({count}{language === 'en' ? '' : '個'})
                                                                  {isDimmed && <Check size={14} strokeWidth={3} style={{ color: 'var(--accent-success)', opacity: 1 }} />}
                                                              </span>
-
-
-
                                                         );
                                                                                 })}
                                                                         </div>
                                                                     );
                                                                 }
-                                                                // Grid table for 5+
                                                                 const ATTRS = ATTRIBUTE_IDS;
                                                                 const KINDS = KIND_IDS;
                                                                 const showSwapped = currentDesign.swapCriteriaDetailGrid;
@@ -1303,7 +1500,6 @@ export default function CriteriaTab() {
                                                                 const tableStyle: React.CSSProperties = { marginTop: '0.4rem', borderCollapse: 'collapse', fontSize: 'var(--font-size-sub)' };
 
                                                                 if (showSwapped) {
-                                                                    // Rows: Elements, Cols: Weapons
                                                                     const activeKinds = KINDS.filter(k => ATTRS.some(a => c.targetCount[`${a}_${k}`] > 0));
                                                                     const activeAttrs = ATTRS.filter(a => KINDS.some(k => (c.targetCount[`${a}_${k}`] || 0) > 0));
                                                                     return (
@@ -1381,7 +1577,6 @@ export default function CriteriaTab() {
                                                                     );
                                                                 }
 
-                                                                // Default: Rows: Weapons, Cols: Elements
                                                                 return (
                                                                     <div style={{ overflowX: 'auto', maxWidth: '100%' }}>
                                                                         <table style={tableStyle}>
@@ -1507,7 +1702,6 @@ export default function CriteriaTab() {
                                                     )}
                                                 </div>
 
-                                                {/* Right: kept AF panel */}
                                                 <div style={{ width: '360px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                                                     <div style={{ fontSize: 'var(--font-size-sub)', fontWeight: 600, color: 'var(--accent-blue-hover)', borderBottom: '1px solid var(--dim-border)', paddingBottom: '0.4rem', display: 'flex', justifyContent: 'space-between' }}>
                                                         <span>{language === 'en' ? 'Saved AFs matching this condition' : '確保中のAF一覧'}</span>
@@ -1595,10 +1789,9 @@ export default function CriteriaTab() {
                                 const isCollapsed = collapsedGroups.has(group.id);
                                 const isEditing = editingGroupId === group.id;
                                 const groupCondCount = block.conds.length;
-                                const isThisGroupAllDisabled = groupCondCount > 0 && block.conds.every(c => c.disabled);
+                                const isThisGroupAllDisabled = groupCondCount > 0 ? block.conds.every(c => c.disabled) : (group.disabled ?? false);
 
                                 return (
-                                    // STEP3: ラッパーdiv – D&DイベントとpaddingBottomでgapを再現
                                     <div key={`group-${group.id}`}
                                         draggable={canDragItemId === group.id}
                                         onDragStart={(e) => {
@@ -1624,13 +1817,10 @@ export default function CriteriaTab() {
                                             }
                                             const rect = e.currentTarget.getBoundingClientRect();
                                             const relY = (e.clientY - rect.top) / rect.height;
-                                            // 判定閾値を調整
                                             const PADDING_PX = 16; 
                                             const distFromBottom = rect.height - (e.clientY - rect.top);
-                                            // 上端15%以内なら top, 下端PADDING_PX以内なら bottom, それ以外は inside
                                             const rawPos = relY < 0.15 ? 'top' : distFromBottom < PADDING_PX ? 'bottom' : 'inside';
                                             
-                                            // STEP4.1: 無移動判定の再構築
                                             let isNoMove = false;
                                             const sBlockIdx = blocks.findIndex(b => b.id === draggedId);
                                             
@@ -1639,9 +1829,8 @@ export default function CriteriaTab() {
 
                                             if (rawPos === 'inside') {
                                                 if (draggedType === 'group') {
-                                                    isNoMove = true; // グループ内にグループは入れられない
+                                                    isNoMove = true;
                                                 } else if (draggedType === 'cond') {
-                                                    // 既にこのグループの最後にいるなら抑制
                                                     const sBlock = blocks.find(b => b.conds.some(cc => cc.id === draggedId));
                                                     if (sBlock && sBlock.id === group.id) {
                                                         const sIdx = sBlock.conds.findIndex(cc => cc.id === draggedId);
@@ -1668,7 +1857,10 @@ export default function CriteriaTab() {
 
                                             try {
                                                 const data = JSON.parse(e.dataTransfer.getData('text/plain'));
-                                                const currentBlocks = getBlocks();
+                                                // DBから最新データを取得してステート遅延を回避
+                                                const conds = await db.conditions.toArray();
+                                                const grps = await db.groups.toArray() as ConditionGroup[];
+                                                const currentBlocks = computeBlocksFromData(conds, grps);
 
                                                 if (data.type === 'cond') {
                                                     let draggedCond: Condition | null = null;
@@ -1766,18 +1958,18 @@ export default function CriteriaTab() {
                                                         <>
                                                             <button 
                                                                 className="btn btn-ghost" 
-                                                                onClick={e => { e.stopPropagation(); handleToggleGroupDisabled(block.conds); }} 
+                                                                onClick={e => { e.stopPropagation(); handleToggleGroupDisabled(group, block.conds); }} 
                                                                 style={{ padding: '0.2rem 0.5rem', color: isThisGroupAllDisabled ? 'var(--accent-success)' : 'var(--text-muted)' }} 
                                                                 title={isThisGroupAllDisabled ? (language === 'en' ? 'Enable All in Folder' : 'フォルダ内を一括有効') : (language === 'en' ? 'Disable All in Folder' : 'フォルダ内を一括無効')}
                                                             >
                                                                 <span style={{ fontSize: 'calc(var(--font-size-sub) + 1px)' }}>{isThisGroupAllDisabled ? '✓' : '⊘'}</span>
                                                             </button>
+                                                            <button className="btn btn-ghost" onClick={e => { e.stopPropagation(); handleCopyGroup(group); }} style={{ padding: '0.2rem 0.6rem', color: 'var(--accent-blue-hover)', opacity: 0.8 }} title={language === 'en' ? 'Copy Folder' : 'フォルダを複製'}>
+                                                                <Copy size={14} />
+                                                            </button>
                                                             <button className="btn btn-ghost" onClick={e => { e.stopPropagation(); handleRenameGroup(group); }} style={{ padding: '0.2rem 0.6rem', opacity: 0.7 }} title={language === 'en' ? 'Rename Folder' : 'フォルダ名を変更'}><span style={{ fontSize: 'calc(var(--font-size-sub) + 1px)' }}>✎</span></button>
                                                             {(() => {
-                                                                const isThisEmptyGroup = groupCondCount === 0;
-                                                                const prevBlock = bIdx > 0 ? blocks[bIdx - 1] : null;
-                                                                const isPrevNonEmpty = prevBlock ? prevBlock.conds.length > 0 : false;
-                                                                const isUpDisabled = bIdx === 0 || (isThisEmptyGroup && isPrevNonEmpty);
+                                                                const isUpDisabled = bIdx === 0;
                                                                 return (
                                                                     <button className="btn btn-ghost" onClick={e => { e.stopPropagation(); moveBlock(bIdx, -1); }} disabled={isUpDisabled} style={{ padding: '0.2rem 0.5rem', opacity: isUpDisabled ? 0.3 : 1 }} title={language === 'en' ? 'Move Folder Up' : 'フォルダを上へ'}><ChevronUp size={14} /></button>
                                                                 );
