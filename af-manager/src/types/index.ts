@@ -211,6 +211,7 @@ export interface Settings {
     protectRareAF: boolean;  // protect rare AFs from discard flag
     protectEquipped: boolean; // protect equipped AFs from discard flag
     protectMemos?: boolean;   // protect AFs that have a memo associated with them
+    protectLv5Skills?: boolean; // protect AFs that have any Lv5 skill
     protectedAttributes?: string[]; // e.g., ["fire", "water"]
   };
   design?: AppDesignSettings;   // UI design preferences
@@ -220,4 +221,6 @@ export interface Settings {
   lastImportedAt?: string;     // ISO timestamp of the most recent AF data import
   notificationDuration?: number;   // Toast display duration in seconds (default: 3)
   notificationMaxCount?: number;   // Max simultaneous toasts (default: 1)
+  saveWindowState?: boolean;       // Save and restore window size/position (default: true)
+  windowState?: { width: number; height: number; x: number; y: number }; // Stored window geometry
 }

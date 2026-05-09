@@ -15,6 +15,15 @@ echo AF Manager Version: %MGR_VERSION%
 echo AF Collector Version: %COL_VERSION%
 echo.
 
+echo [0/3] Cleaning up old bundles and binaries...
+set RELEASE_DIR=af-manager\src-tauri\target\release
+if exist "%RELEASE_DIR%\bundle" (
+    rmdir /s /q "%RELEASE_DIR%\bundle"
+)
+if exist "%RELEASE_DIR%\GBF_AF_Manager.exe" (
+    del /q "%RELEASE_DIR%\GBF_AF_Manager.exe"
+)
+
 echo [1/3] Building Frontend and Tauri App...
 cd af-manager
 call npx tauri build

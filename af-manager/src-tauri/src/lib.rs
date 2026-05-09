@@ -5,7 +5,7 @@ use axum::{
     Json, Router,
 };
 use std::sync::Arc;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use tower_http::cors::CorsLayer;
 
 // アプリハンドルを axum のステートとして共有
@@ -56,10 +56,44 @@ pub fn start_http_server(handle: AppHandle) {
     });
 }
 
+#[tauri::command]
+fn set_window_state_enabled(handle: AppHandle, enabled: bool) {
+    if let Ok(app_dir) = handle.path().app_data_dir() {
+        let _ = std::fs::create_dir_all(&app_dir);
+        let path = app_dir.join("window-state-config.json");
+        let config = serde_json::json!({ "enabled": enabled });
+        if let Ok(content) = serde_json::to_string(&config) {
+            let _ = std::fs::write(path, content);
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler![set_window_state_enabled])
         .setup(|app| {
+            // ウィンドウ状態保存設定の読み込み
+            let enabled = (|| {
+                let path = app.path().app_data_dir().ok()?.join("window-state-config.json");
+                let content = std::fs::read_to_string(path).ok()?;
+                let json: serde_json::Value = serde_json::from_str(&content).ok()?;
+                json["enabled"].as_bool()
+            })().unwrap_or(true);
+
+            if enabled {
+                // 有効な場合のみプラグインを登録。その後ウィンドウを生成することで、プラグインが確実にフックを捕捉できる。
+                app.handle().plugin(tauri_plugin_window_state::Builder::default().build())?;
+            }
+
+            // `tauri.conf.json` の "windows" 設定をここで手動実行する
+            tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::App("index.html".into()))
+                .title("GBF AF Manager")
+                .inner_size(1280.0, 800.0)
+                .resizable(true)
+                .fullscreen(false)
+                .build()?;
+
             if cfg!(debug_assertions) {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()

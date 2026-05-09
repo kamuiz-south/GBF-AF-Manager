@@ -44,12 +44,14 @@ export async function runDiscardCalc(settings: Settings, language: string = 'ja'
     for (const a of artifacts) {
         const eq = (a as any).equip_npc_info;
         const isEquippedAF = eq && !Array.isArray(eq) && typeof eq === 'object';
+        const hasLv5Skill = a.skill1_info?.level >= 5 || a.skill2_info?.level >= 5 || a.skill3_info?.level >= 5 || a.skill4_info?.level >= 5;
         const isProtected =
             ((b.protectLocked ?? true) && a.is_locked) ||
             ((b.protectKeepFlag ?? true) && !!a.keepFlag) ||
             ((b.protectRareAF ?? true) && isRareArtifact(a)) ||
             ((b.protectEquipped ?? true) && isEquippedAF) ||
             ((b.protectMemos ?? true) && memoIds.has(a.id)) ||
+            ((b.protectLv5Skills ?? true) && hasLv5Skill) ||
             (b.protectedAttributes?.includes(a.attribute.toString()) ?? false);
 
         if (isProtected) {

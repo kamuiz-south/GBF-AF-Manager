@@ -138,10 +138,10 @@ export default function HelpTab() {
                 {/* 確保ロジック */}
                 <div style={{ background: 'var(--dim-bg)', border: '1px solid var(--panel-border)', borderRadius: '8px', padding: '1rem', marginBottom: '1rem' }}>
                     <div style={{ fontWeight: 700, fontSize: 'var(--font-size-main)', marginBottom: '0.7rem', color: 'var(--text-main)' }}>{language === 'en' ? '📌 Keep Flag Logic Pipeline' : '📌 確保フラグの判定ロジック'}</div>
-                    <p style={{ fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)', lineHeight: 1.7, marginBottom: '0.6rem' }}>
+                    <p style={{ fontSize: 'var(--font-size-main)', color: 'var(--text-muted)', lineHeight: 1.7, marginBottom: '0.6rem' }}>
                         {language === 'en' ? 'For each condition, all AFs matching the designated [Element × Weapon Kind] are evaluated and sorted in this exact order:' : '各条件において、指定した【属性×武器種】に該当する全AFに対して以下の順でふるいにかけます：'}
                     </p>
-                    <ol style={{ fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)', lineHeight: 1.8, paddingLeft: '1.4rem', margin: 0 }}>
+                    <ol style={{ fontSize: 'var(--font-size-main)', color: 'var(--text-muted)', lineHeight: 1.8, paddingLeft: '1.4rem', margin: 0 }}>
                         <li><strong style={{ color: 'var(--text-main)' }}>{language === 'en' ? '1. Exclusion Check:' : '1. 除外判定:'}</strong> {language === 'en' ? 'Drops AFs that are "Favorited" (if enabled) or contain any "Excluded Skills".' : '「お気に入りAF」や「除外スキル」に該当するAFを候補から落とします。'}</li>
                         <li><strong style={{ color: 'var(--text-main)' }}>{language === 'en' ? '2. Target Skill Check:' : '2. 希望スキル判定:'}</strong> {language === 'en' ? 'Drops AFs that do not possess all "Must Match" skills, OR possess NONE of your designated target skills.' : '「必須」に設定したスキルを欠いているAFや、指定した希望スキル群を「1つも持っていない」AFを候補から落とします。'}</li>
                         <li><strong style={{ color: 'var(--text-main)' }}>{language === 'en' ? '3. Priority Sorting:' : '3. 優先度ソート:'}</strong> {language === 'en' ? 'Sorts the remaining candidates from best to worst based on:' : '候補に残ったAFを、以下の基準で優秀な順に並び替えます：'}

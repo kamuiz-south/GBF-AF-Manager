@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { Download, Upload, Trash2, Plus, Minus, RefreshCw, Palette, Zap, Save, Settings as SettingsIcon, ShieldAlert, MonitorUp, HardDrive, ArrowRight, Calculator, Sun, Moon, GripVertical, Copy, ChevronRight, ChevronDown, FolderPlus, AlertTriangle, Folder, Edit2, RotateCcw, Bell } from 'lucide-react';
 import { db } from '../db';
 import type { Settings } from '../types';
@@ -45,7 +46,8 @@ export const DEFAULT_SETTINGS: Settings = {
         protectRareAF: true,
         protectEquipped: true,
     },
-    pageLimit: 10
+    pageLimit: 10,
+    saveWindowState: true
 };
 
 export default function SettingsTab() {
@@ -1260,6 +1262,13 @@ export default function SettingsTab() {
                         />
                         <span><strong>{language === 'en' ? 'Protect AFs with Memos' : 'メモ付きのAFを保護'}</strong><br /><span style={{ fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)' }}>{language === 'en' ? 'Excludes AFs that have any memo text attached.' : 'メモ欄にテキストが入力されているAFを廃棄候補から除外します。'}</span></span>
                     </label>
+                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.8rem', cursor: 'pointer', fontSize: 'var(--font-size-main)' }}>
+                        <input type="checkbox" style={{ marginTop: '3px' }}
+                            checked={settings.discardBehavior.protectLv5Skills ?? true}
+                            onChange={e => updateDiscardSettings({ protectLv5Skills: e.target.checked })}
+                        />
+                        <span><strong>{language === 'en' ? 'Protect AFs with Lv5 Skills' : 'Lv5スキル持ちのAFを保護'}</strong><br /><span style={{ fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)' }}>{language === 'en' ? 'Excludes AFs that have at least one level 5 skill.' : 'いずれかのスキルがLv5まで強化されているAFを廃棄候補から除外します。'}</span></span>
+                    </label>
                 </div>
 
                 <div style={{ marginBottom: '1.5rem', background: 'var(--grid-item-bg)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
@@ -1776,6 +1785,30 @@ export default function SettingsTab() {
                 <h3 style={{ fontSize: 'calc(var(--font-size-main) * 1.2)', marginBottom: '1.5rem', borderBottom: '1px solid var(--panel-border)', paddingBottom: '0.8rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <MonitorUp size={18} /> {language === 'en' ? 'Desktop App Advanced Settings' : 'デスクトップアプリ版 上級者設定'}
                 </h3>
+
+                <div style={{ marginBottom: '1.5rem' }}>
+                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.7rem', cursor: 'pointer', fontSize: 'var(--font-size-main)', fontWeight: 600 }}>
+                        <input type="checkbox" style={{ marginTop: '4px' }}
+                            checked={settings.saveWindowState ?? true}
+                            onChange={e => {
+                                const enabled = e.target.checked;
+                                const newSettings = { ...settings, saveWindowState: enabled };
+                                setSettings(newSettings);
+                                db.settings.put(newSettings).catch(console.error);
+                                // バックエンド側の設定ファイルも更新（次回起動時に反映）
+                                invoke('set_window_state_enabled', { enabled }).catch(console.error);
+                            }} />
+                        <span>
+                            {language === 'en' ? 'Save Window Size and Position' : 'ウィンドウのサイズと位置を保存・復元する'}
+                            <br />
+                            <span style={{ fontSize: 'calc(var(--font-size-sub) * 0.97)', color: 'var(--text-muted)', fontWeight: 400, display: 'inline-block', marginTop: '0.3rem', lineHeight: 1.5 }}>
+                                {language === 'en'
+                                    ? 'When ON, the application will remember its size and position when reopened.'
+                                    : 'ONの場合、次回アプリ起動時に前回終了時のウィンドウサイズと位置を自動で再現します。'}
+                            </span>
+                        </span>
+                    </label>
+                </div>
 
                 <label style={{ display: 'block', fontSize: 'var(--font-size-main)', marginBottom: '0.4rem', fontWeight: 600 }}>
                     {language === 'en' ? 'AF Collector Receive Port Number' : 'AF Collector 受信ポート番号'}
