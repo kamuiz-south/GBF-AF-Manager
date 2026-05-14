@@ -86,12 +86,19 @@ pub fn run() {
                 app.handle().plugin(tauri_plugin_window_state::Builder::default().build())?;
             }
 
-            // `tauri.conf.json` の "windows" 設定をここで手動実行する
-            tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::App("index.html".into()))
-                .title("GBF AF Manager")
-                .inner_size(1280.0, 800.0)
-                .resizable(true)
-                .fullscreen(false)
+            // JSONから設定をデシリアライズしてウィンドウを手動生成する
+            // (tauri.conf.json の windows 自動生成によるパニックを避けるため)
+            let config_json = serde_json::json!({
+                "label": "main",
+                "title": "GBF AF Manager",
+                "width": 1280,
+                "height": 800,
+                "resizable": true,
+                "fullscreen": false,
+                "dragDropEnabled": false
+            });
+            let config: tauri::utils::config::WindowConfig = serde_json::from_value(config_json).unwrap();
+            tauri::WebviewWindowBuilder::from_config(app, &config)?
                 .build()?;
 
             if cfg!(debug_assertions) {

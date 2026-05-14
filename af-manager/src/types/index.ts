@@ -86,6 +86,13 @@ export interface Condition {
   occupyKeepFlag: boolean; // if true, only flags it if it currently has no keepFlag
   memo?: string; // optional per-condition memo
   disabled?: boolean; // if true, this condition is excluded from keep-flag calculation
+
+  compareByEffectValue?: {
+    skill1: boolean;
+    skill2: boolean;
+    skill3: boolean;
+    skill4: boolean;
+  };
 }
 
 export interface FooterColorSetting {

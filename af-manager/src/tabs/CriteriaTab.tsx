@@ -74,6 +74,8 @@ export default function CriteriaTab() {
     const [skillMustMatch, setSkillMustMatch] = useState({ skill1: false, skill2: false, skill3: false, skill4: false });
     const [skillPriorities, setSkillPriorities] = useState<{ skill1: number | null, skill2: number | null, skill3: number | null, skill4: number | null }>({ skill1: null, skill2: null, skill3: null, skill4: null });
     const [invertSkill3Quality, setInvertSkill3Quality] = useState(false);
+    const [compareByEffectValue, setCompareByEffectValue] = useState({ skill1: false, skill2: false, skill3: false, skill4: false });
+    const [showCompareEffectValue, setShowCompareEffectValue] = useState(false);
     const [excludeSkillsUI, setExcludeSkillsUI] = useState<{ id: string, group: 'G1' | 'G2' | 'G3', skill: string }[]>([]);
     const [excludeFavorites, setExcludeFavorites] = useState(false);
 
@@ -151,6 +153,28 @@ export default function CriteriaTab() {
             return;
         }
 
+        // Validate compareByEffectValue configuration
+        if (showCompareEffectValue) {
+            const hasCompareSkill = Object.values(compareByEffectValue).some(v => v);
+            if (!hasCompareSkill) {
+                showToast(language === 'en' ? 'Please select at least one skill to apply effect value comparison.' : '効果量実数値・強化レベルで比較するスキルを少なくとも1つ選択してください。', 'error');
+                return;
+            }
+
+            const missingPrioritySkills: number[] = [];
+            if (compareByEffectValue.skill1 && skillPriorities.skill1 === null) missingPrioritySkills.push(1);
+            if (compareByEffectValue.skill2 && skillPriorities.skill2 === null) missingPrioritySkills.push(2);
+            if (compareByEffectValue.skill3 && skillPriorities.skill3 === null) missingPrioritySkills.push(3);
+            if (compareByEffectValue.skill4 && skillPriorities.skill4 === null) missingPrioritySkills.push(4);
+
+            if (missingPrioritySkills.length > 0) {
+                const names = missingPrioritySkills.map(n => `スキル${n}`).join(', ');
+                const namesEn = missingPrioritySkills.map(n => `Skill ${n}`).join(', ');
+                showToast(language === 'en' ? `☆ Priority is not set for ${namesEn} which has effect value comparison enabled.` : `実数値比較が適用されている ${names} の☆優先順位が設定されていません。`, 'error');
+                return;
+            }
+        }
+
         // 真の末尾位置を計算するためにDBから最新取得
         const latestConds = await db.conditions.toArray();
         const latestGroups = await db.groups.toArray() as ConditionGroup[];
@@ -188,6 +212,7 @@ export default function CriteriaTab() {
             skillPriorities,
             skillMustMatch,
             invertSkill3Quality,
+            compareByEffectValue,
             excludeFavorites,
             occupyKeepFlag: true,
             memo: condMemo || undefined,
@@ -206,6 +231,8 @@ export default function CriteriaTab() {
         setSkillMustMatch({ skill1: false, skill2: false, skill3: false, skill4: false });
         setSkillPriorities({ skill1: null, skill2: null, skill3: null, skill4: null });
         setInvertSkill3Quality(false);
+        setCompareByEffectValue({ skill1: false, skill2: false, skill3: false, skill4: false });
+        setShowCompareEffectValue(false);
         setExcludeSkillsUI([]);
         setExcludeFavorites(false);
         setM2Kind2('');
@@ -515,6 +542,8 @@ export default function CriteriaTab() {
         setSkillMustMatch(c.skillMustMatch || { skill1: false, skill2: false, skill3: false, skill4: false });
         setSkillPriorities(c.skillPriorities || { skill1: null, skill2: null, skill3: null, skill4: null });
         setInvertSkill3Quality(c.invertSkill3Quality || false);
+        setCompareByEffectValue(c.compareByEffectValue || { skill1: false, skill2: false, skill3: false, skill4: false });
+        setShowCompareEffectValue(!!c.compareByEffectValue && Object.values(c.compareByEffectValue).some(v => v));
         setExcludeFavorites(c.excludeFavorites || false);
 
         const initExcludeUI = (c.excludeSkills || []).map(skillName => {
@@ -543,6 +572,8 @@ export default function CriteriaTab() {
         setSkillMustMatch({ skill1: false, skill2: false, skill3: false, skill4: false });
         setSkillPriorities({ skill1: null, skill2: null, skill3: null, skill4: null });
         setInvertSkill3Quality(false);
+        setCompareByEffectValue({ skill1: false, skill2: false, skill3: false, skill4: false });
+        setShowCompareEffectValue(false);
         setExcludeSkillsUI([]);
         setExcludeFavorites(false);
         setM2Kind2('');
@@ -1062,6 +1093,46 @@ export default function CriteriaTab() {
                                 </div>
                             )}
                         </div>
+
+                        {/* Compare by Effect Value (Advanced) */}
+                        <div style={{ marginBottom: '0.8rem', padding: '0.6rem 0.8rem', background: 'var(--dim-bg)', borderRadius: '6px' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', color: 'var(--text-main)', marginBottom: showCompareEffectValue ? '0.6rem' : '0' }}>
+                                <input
+                                    type="checkbox"
+                                    checked={showCompareEffectValue}
+                                    onChange={e => {
+                                        setShowCompareEffectValue(e.target.checked);
+                                        if (!e.target.checked) {
+                                            setCompareByEffectValue({ skill1: false, skill2: false, skill3: false, skill4: false });
+                                        }
+                                    }}
+                                />
+                                <span style={{ fontSize: 'var(--font-size-main)', fontWeight: 600 }}>
+                                    {language === 'en' ? 'Compare by effect value or enhance level instead of skill quality (☆)' : 'スキル品質（☆）の代わりに効果量実数値・強化レベルで比較する'}
+                                </span>
+                            </label>
+                            {showCompareEffectValue && (
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', marginLeft: '1.6rem' }}>
+                                    {[1, 2, 3, 4].map(num => {
+                                        const k = `skill${num}` as keyof typeof skills;
+                                        return (
+                                            <label key={`comp-${k}`} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', color: skills[k] ? 'var(--text-main)' : 'var(--text-muted)' }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={compareByEffectValue[k as keyof typeof compareByEffectValue]}
+                                                    onChange={e => setCompareByEffectValue({ ...compareByEffectValue, [k]: e.target.checked })}
+                                                    disabled={!skills[k]}
+                                                />
+                                                <span style={{ fontSize: 'var(--font-size-sub)' }}>
+                                                    {language === 'en' ? `Apply to Skill ${num}` : `スキル${num} に適用`}
+                                                </span>
+                                            </label>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+
                         {/* Exclude Skills */}
                         <div style={{ marginBottom: '0.8rem', marginTop: '0.8rem', borderTop: '1px solid var(--panel-border)', paddingTop: '0.8rem' }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.6rem' }}>
@@ -1729,6 +1800,7 @@ export default function CriteriaTab() {
                                                                             flexShrink: 0,
                                                                             textShadow: isQ5 ? q5Outline : 'none'
                                                                         }}>★{sk.skill_quality}</span>
+                                                                        <span style={{ color: 'var(--text-main)', flexShrink: 0, fontWeight: 'normal' }}>Lv{sk.level}</span>
                                                                         <span style={{ color: 'var(--accent-success)', minWidth: '26px', flexShrink: 0 }}>{glabel}</span>
                                                                         <span style={{ color: 'var(--text-main)', flex: 1, wordBreak: 'break-all' }}>{language === 'en' ? translateSkill(sk.name, language) : sk.name}</span>
                                                                         <span style={{ 

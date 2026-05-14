@@ -176,10 +176,24 @@ function getQualityOfPriority(artifact: AppArtifact, cond: Condition, targetPrio
 
     // Find which skill index (1-4) corresponds to the requested priority
     let skillNameTarget = "";
-    if (cond.skillPriorities.skill1 === targetPriority && cond.skills.skill1) skillNameTarget = cond.skills.skill1;
-    if (cond.skillPriorities.skill2 === targetPriority && cond.skills.skill2) skillNameTarget = cond.skills.skill2;
-    if (cond.skillPriorities.skill3 === targetPriority && cond.skills.skill3) skillNameTarget = cond.skills.skill3;
-    if (cond.skillPriorities.skill4 === targetPriority && cond.skills.skill4) skillNameTarget = cond.skills.skill4;
+    let isCompareByValue = false;
+
+    if (cond.skillPriorities.skill1 === targetPriority && cond.skills.skill1) {
+        skillNameTarget = cond.skills.skill1;
+        isCompareByValue = cond.compareByEffectValue?.skill1 ?? false;
+    }
+    if (cond.skillPriorities.skill2 === targetPriority && cond.skills.skill2) {
+        skillNameTarget = cond.skills.skill2;
+        isCompareByValue = cond.compareByEffectValue?.skill2 ?? false;
+    }
+    if (cond.skillPriorities.skill3 === targetPriority && cond.skills.skill3) {
+        skillNameTarget = cond.skills.skill3;
+        isCompareByValue = cond.compareByEffectValue?.skill3 ?? false;
+    }
+    if (cond.skillPriorities.skill4 === targetPriority && cond.skills.skill4) {
+        skillNameTarget = cond.skills.skill4;
+        isCompareByValue = cond.compareByEffectValue?.skill4 ?? false;
+    }
 
     if (!skillNameTarget) return 0; // The user didn't assign this priority to any valid skill
 
@@ -190,7 +204,19 @@ function getQualityOfPriority(artifact: AppArtifact, cond: Condition, targetPrio
 
     const cleanTarget = getCleanName(skillNameTarget);
 
-    // Find the skill in the artifact that exactly matches this clean name and return its quality
+    // Find the skill in the artifact that exactly matches this clean name
     const matchedSkill = skills.find(s => getCleanName(s.name) === cleanTarget);
-    return matchedSkill ? matchedSkill.skill_quality : 0;
+    if (!matchedSkill) return 0;
+
+    if (isCompareByValue) {
+        // 正規表現で数値を抽出 (例: "防御力-70%", "攻撃力+150", "奥義ダメージ3.5%UP")
+        const match = matchedSkill.effect_value?.match(/[-+]?\d+(\.\d+)?/);
+        if (match) {
+            return parseFloat(match[0]);
+        }
+        // 数値が抽出できない場合は強化レベルへフォールバック (それもなければ品質)
+        return matchedSkill.level || matchedSkill.skill_quality || 0;
+    }
+
+    return matchedSkill.skill_quality;
 }
