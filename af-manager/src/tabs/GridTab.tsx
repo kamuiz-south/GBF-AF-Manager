@@ -1,13 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { AlertTriangle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Heart, Package, Star, Trash2, Unlock, User } from 'lucide-react';
+import { AlertTriangle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Heart, Package, Star, Trash2, Unlock, User, Settings as SettingsIcon } from 'lucide-react';
 import { db } from '../db';
 import { useAppStore } from '../store/useAppStore';
-import { isRareArtifact } from '../utils/evaluator';
+import { isRareArtifact, getCleanName } from '../utils/evaluator';
 import { useTranslation, type TranslationKey } from '../i18n';
 import { DEFAULT_DESIGN } from '../types';
-import { G1_SKILLS, G2_SKILLS, G3_SKILLS } from '../data/skillMaster';
+import { G1_SKILLS, G2_SKILLS, G3_SKILLS, SKILL_MASTER_BY_BASE_ID } from '../data/skillMaster';
 import WeaponIcon from '../components/WeaponIcon';
+import { translateSkill } from '../utils/skillMapping';
+import { useSkillFilter } from '../hooks/useSkillFilter';
+import { SkillFilterPopup } from '../components/SkillFilterPopup';
 
 const ATTR_TEXT_COLORS: Record<string, string> = {
     "1": "#ef4444", // Fire
@@ -45,9 +48,21 @@ export default function GridTab() {
     const [filterKind, setFilterKind] = useState('');
     const [filterSkill, setFilterSkill] = useState('');
 
+    const {
+        skillFilterFields,
+        skillFilterMySets,
+        saveSkillFilterFields,
+        saveMySet,
+        deleteMySet,
+        toggleMySetLock,
+        isSkillFilterOpen,
+        setIsSkillFilterOpen,
+        matchesSkillFilter
+    } = useSkillFilter();
+
     const ITEMS_PER_PAGE = 20;
     // Sort by inventory order, then apply attribute/kind filters
-    const sorted = [...artifacts].sort((a, b) => {
+    const sorted = useMemo(() => [...artifacts].sort((a, b) => {
         // inventoryOrderが未定義の場合は非常に大きな値を仮置き
         const orderA = a.inventoryOrder ?? Number.MAX_SAFE_INTEGER;
         const orderB = b.inventoryOrder ?? Number.MAX_SAFE_INTEGER;
@@ -56,21 +71,25 @@ export default function GridTab() {
         }
         // orderが同じ（または未定義同士）なら、IDの降順（新しい順）で代替ソート
         return b.id - a.id;
-    });
-    const filtered = sorted.filter(a =>
+    }), [artifacts]);
+
+    const filtered = useMemo(() => sorted.filter(a =>
         (filterAttr === '' || a.attribute === filterAttr) &&
         (filterKind === '' || a.kind === filterKind) &&
-        (filterSkill === '' || [
-            a.skill1_info?.name,
-            a.skill2_info?.name,
-            a.skill3_info?.name,
-            a.skill4_info?.name
-        ].some(name => {
-            if (!name) return false;
-            const stripped = name.split("　◆")[0].split(" ◆")[0].trim();
-            return stripped === filterSkill;
-        }))
-    );
+        (
+            filterSkill === '' ||
+            (filterSkill === 'active' && matchesSkillFilter(a)) ||
+            (filterSkill.startsWith('skill_') && (() => {
+                const baseId = parseInt(filterSkill.replace('skill_', ''));
+                const skillInfo = SKILL_MASTER_BY_BASE_ID.get(baseId);
+                if (!skillInfo) return false;
+                const targetName = getCleanName(skillInfo.name);
+                return [a.skill1_info, a.skill2_info, a.skill3_info, a.skill4_info]
+                    .some(s => getCleanName(s?.name) === targetName);
+            })())
+        )
+    ), [sorted, filterAttr, filterKind, filterSkill, matchesSkillFilter]);
+
     const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
     const pageItems = filtered.slice(currentPage * ITEMS_PER_PAGE, (currentPage + 1) * ITEMS_PER_PAGE);
 
@@ -85,6 +104,27 @@ export default function GridTab() {
         }
     }, [pageItems, selectedArtifact, setSelectedArtifact]);
 
+    // Keyboard navigation for pages
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
+                return;
+            }
+            if (isSkillFilterOpen) {
+                return;
+            }
+            
+            if (e.key === 'ArrowLeft') {
+                setCurrentPage(c => Math.max(0, c - 1));
+            } else if (e.key === 'ArrowRight') {
+                setCurrentPage(c => Math.min(totalPages - 1, c + 1));
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [totalPages, isSkillFilterOpen]);
+
     const settings = useLiveQuery(() => db.settings.get('global'));
     const noMaxHeight = settings?.design?.gridDetailNoMaxHeight;
     const detailSkillNoWrap = settings?.design?.detailSkillNoWrap ?? false;
@@ -95,16 +135,16 @@ export default function GridTab() {
             <div className="glass-panel" style={{ padding: '1rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '0.8rem', minHeight: noMaxHeight ? 'none' : '260px', maxHeight: noMaxHeight ? 'none' : '310px', overflowY: 'auto' }}>
                 {selectedArtifact ? (
                     <>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--panel-border)', paddingBottom: '0.5rem' }}>
-                            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                                <h3 style={{ fontSize: 'calc(var(--font-size-main) * 1.3)', margin: 0 }}>{selectedArtifact.name}</h3>
-                                <span style={{ background: 'var(--dim-bg)', padding: '2px 8px', borderRadius: '12px', fontSize: 'var(--font-size-sub)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--panel-border)', paddingBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                            <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                                <h3 style={{ fontSize: 'calc(var(--font-size-main) * 1.3)', margin: 0, whiteSpace: 'nowrap' }}>{selectedArtifact.name}</h3>
+                                <span style={{ background: 'var(--dim-bg)', padding: '2px 8px', borderRadius: '12px', fontSize: 'var(--font-size-sub)', whiteSpace: 'nowrap' }}>
                                     Lv {selectedArtifact.level}/{selectedArtifact.max_level}
                                 </span>
                                 <span style={{
                                     background: ATTR_BADGE_COLORS[selectedArtifact.attribute]?.bg || '#777',
                                     color: ATTR_BADGE_COLORS[selectedArtifact.attribute]?.text || '#fff',
-                                    fontSize: 'var(--font-size-sub)', fontWeight: 'bold', padding: '2px 8px', borderRadius: '4px'
+                                    fontSize: 'var(--font-size-sub)', fontWeight: 'bold', padding: '2px 8px', borderRadius: '4px', whiteSpace: 'nowrap'
                                 }}>
                                     {language === 'en'
                                         ? `${t(`ATTR_${selectedArtifact.attribute}` as TranslationKey)} / ${t(`WPN_${selectedArtifact.kind}` as TranslationKey)}`
@@ -113,13 +153,15 @@ export default function GridTab() {
                                 </span>
                             </div>
                             <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                                {selectedArtifact.is_locked && <span style={{ fontSize: 'calc(var(--font-size-sub) * 0.87)', background: 'var(--accent-gold)', color: '#000', padding: '2px 5px', borderRadius: '4px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}><Heart size={13} /> {language === 'en' ? 'Fav' : 'お気に入り'}</span>}
-                                {selectedArtifact.is_unnecessary && <span style={{ fontSize: 'calc(var(--font-size-sub) * 0.87)', background: 'var(--accent-purple)', color: '#fff', padding: '2px 5px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '3px' }}><Package size={13} /> {language === 'en' ? 'Trash' : '不用品'}</span>}
-                                {selectedArtifact.discardFlag && <span style={{ fontSize: 'calc(var(--font-size-sub) * 0.87)', background: 'var(--accent-danger)', color: '#fff', padding: '2px 5px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '3px' }}><Trash2 size={13} /> {language === 'en' ? 'Discard' : '廃棄提案'}</span>}
-                                {selectedArtifact.keepFlag && <span style={{ fontSize: 'calc(var(--font-size-sub) * 0.87)', background: 'var(--accent-blue)', color: '#fff', padding: '2px 5px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '3px' }}><Star size={13} /> {language === 'en' ? 'Keep' : '確保提案'}</span>}
-                                <span style={{ fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)', marginLeft: '0.4rem' }}>ID: {selectedArtifact.id}</span>
+                                <div style={{ display: 'flex', gap: '0.15rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                                    {selectedArtifact.is_locked && <span style={{ fontSize: 'calc(var(--font-size-sub) * 0.87)', background: 'var(--accent-gold)', color: '#000', padding: '2px 5px', borderRadius: '4px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px', whiteSpace: 'nowrap' }}><Heart size={13} /> {language === 'en' ? 'Fav' : 'お気に入り'}</span>}
+                                    {selectedArtifact.is_unnecessary && <span style={{ fontSize: 'calc(var(--font-size-sub) * 0.87)', background: 'var(--accent-purple)', color: '#fff', padding: '2px 5px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '3px', whiteSpace: 'nowrap' }}><Package size={13} /> {language === 'en' ? 'Trash' : '不用品'}</span>}
+                                    {selectedArtifact.discardFlag && <span style={{ fontSize: 'calc(var(--font-size-sub) * 0.87)', background: 'var(--accent-danger)', color: '#fff', padding: '2px 5px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '3px', whiteSpace: 'nowrap' }}><Trash2 size={13} /> {language === 'en' ? 'Discard' : '廃棄提案'}</span>}
+                                    {selectedArtifact.keepFlag && <span style={{ fontSize: 'calc(var(--font-size-sub) * 0.87)', background: 'var(--accent-blue)', color: '#fff', padding: '2px 5px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '3px', whiteSpace: 'nowrap' }}><Star size={13} /> {language === 'en' ? 'Keep' : '確保提案'}</span>}
+                                </div>
+                                <span style={{ fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)', marginLeft: '0.4rem', whiteSpace: 'nowrap' }}>ID: {selectedArtifact.id}</span>
                                 {selectedArtifact.evaluationScore !== undefined && selectedArtifact.evaluationScore !== null && (
-                                    <span style={{ fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)' }}>
+                                    <span style={{ fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
                                         {language === 'en' ? 'Eval:' : '評価:'} {selectedArtifact.evaluationScore === -1 ? '---' : selectedArtifact.evaluationScore.toFixed(2)}
                                     </span>
                                 )}
@@ -197,26 +239,34 @@ export default function GridTab() {
                             <option key={k} value={k}>{t(`WPN_${k}` as TranslationKey)}</option>
                         ))}
                     </select>
-                    <select className="input" style={{ padding: '0.3rem 0.5rem', width: 'auto', fontSize: 'var(--font-size-sub)', maxWidth: '140px' }}
-                        value={filterSkill}
-                        onChange={e => { setFilterSkill(e.target.value); }}>
-                        <option value="">{language === 'en' ? 'Skill: ' : 'スキル: '}{t('UI_ALL')}</option>
-                        <optgroup label={language === 'en' ? 'Group [Ⅰ]' : 'グループ 【Ⅰ】'}>
-                            {G1_SKILLS.map(s => (
-                                <option key={s.name} value={s.name}>{s.name}</option>
-                            ))}
-                        </optgroup>
-                        <optgroup label={language === 'en' ? 'Group [Ⅱ]' : 'グループ 【Ⅱ】'}>
-                            {G2_SKILLS.map(s => (
-                                <option key={s.name} value={s.name}>{s.name}</option>
-                            ))}
-                        </optgroup>
-                        <optgroup label={language === 'en' ? 'Group [Ⅲ]' : 'グループ 【Ⅲ】'}>
-                            {G3_SKILLS.map(s => (
-                                <option key={s.name} value={s.name}>{s.name}</option>
-                            ))}
-                        </optgroup>
-                    </select>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                        <select className="input" style={{ padding: '0.3rem 0.5rem', width: 'auto', fontSize: 'var(--font-size-sub)', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                            value={filterSkill}
+                            onChange={e => { setFilterSkill(e.target.value); }}>
+                            <option value="">{language === 'en' ? 'Skill: ' : 'スキル: '}{t('UI_ALL')}</option>
+                            <option value="active">{language === 'en' ? 'Skill Filter Active' : 'スキルフィルター有効'}</option>
+                            <optgroup label={language === 'en' ? '── Gr [I] ──' : '── Gr [Ⅰ] ──'}>
+                                {G1_SKILLS.map(s => (
+                                    <option key={s.baseId} value={`skill_${s.baseId}`}>{translateSkill(s.name, language)}</option>
+                                ))}
+                            </optgroup>
+                            <optgroup label={language === 'en' ? '── Gr [II] ──' : '── Gr [Ⅱ] ──'}>
+                                {G2_SKILLS.map(s => (
+                                    <option key={s.baseId} value={`skill_${s.baseId}`}>{translateSkill(s.name, language)}</option>
+                                ))}
+                            </optgroup>
+                            <optgroup label={language === 'en' ? '── Gr [III] ──' : '── Gr [Ⅲ] ──'}>
+                                {G3_SKILLS.map(s => (
+                                    <option key={s.baseId} value={`skill_${s.baseId}`}>{translateSkill(s.name, language)}</option>
+                                ))}
+                            </optgroup>
+                        </select>
+                        <button className="btn btn-ghost" style={{ padding: '0.3rem', borderRadius: '6px' }}
+                            onClick={() => setIsSkillFilterOpen(true)}
+                            title={language === 'en' ? 'Skill Filter Settings' : 'スキルフィルター設定'}>
+                            <SettingsIcon size={16} />
+                        </button>
+                    </div>
                     {(filterAttr || filterKind || filterSkill) && (
                         <button style={{ fontSize: 'calc(var(--font-size-sub) * 0.94)', padding: '0.25rem 0.5rem', background: 'var(--dim-bg)', border: '1px solid var(--dim-border)', borderRadius: '6px', cursor: 'pointer', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}
                             onClick={() => { setFilterAttr(''); setFilterKind(''); setFilterSkill(''); }}>
@@ -417,7 +467,7 @@ export default function GridTab() {
                 </div>
 
                 {/* Pagination Controls */}
-                <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', marginTop: '0.4rem' }}>
+                <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', marginTop: '0.4rem' }}>
                     <button
                         className="btn btn-ghost"
                         style={{ padding: '0.3rem', borderRadius: '6px' }}
@@ -459,6 +509,19 @@ export default function GridTab() {
                     </button>
                 </div>
             </div>
+
+            <SkillFilterPopup
+                isOpen={isSkillFilterOpen}
+                onClose={() => setIsSkillFilterOpen(false)}
+                skillFilterFields={skillFilterFields}
+                saveSkillFilterFields={saveSkillFilterFields}
+                skillFilterMySets={skillFilterMySets}
+                saveMySet={saveMySet}
+                deleteMySet={deleteMySet}
+                toggleMySetLock={toggleMySetLock}
+                language={language}
+                theme={settings?.design?.theme || 'dark'}
+            />
         </div>
     );
 }

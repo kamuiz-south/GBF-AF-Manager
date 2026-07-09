@@ -219,6 +219,9 @@ export interface Settings {
     protectEquipped: boolean; // protect equipped AFs from discard flag
     protectMemos?: boolean;   // protect AFs that have a memo associated with them
     protectLv5Skills?: boolean; // protect AFs that have any Lv5 skill
+    protectQuality5Skills?: boolean; // protect AFs that have any 5-star skill
+    protectQuality5Method?: 'all' | 'specific';
+    protectedQuality5SkillsList?: Array<{ conditionGroup: number; conditionSkillName: string | number }>;
     protectedAttributes?: string[]; // e.g., ["fire", "water"]
   };
   design?: AppDesignSettings;   // UI design preferences
@@ -230,4 +233,11 @@ export interface Settings {
   notificationMaxCount?: number;   // Max simultaneous toasts (default: 1)
   saveWindowState?: boolean;       // Save and restore window size/position (default: true)
   windowState?: { width: number; height: number; x: number; y: number }; // Stored window geometry
+  skillFilterFields?: number[][];  // Skill filter for ListTab: 3 fields of baseId arrays (OR between fields, AND within)
+  skillFilterMySets?: {
+    [key: number]: {
+      fields: number[][];
+      locked: boolean;
+    };
+  };
 }

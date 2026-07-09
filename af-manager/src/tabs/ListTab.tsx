@@ -1,10 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Search, ArrowUpDown, Heart, Package, Star, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Search, ArrowUpDown, Heart, Package, Star, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Settings as SettingsIcon } from 'lucide-react';
 import { db } from '../db';
 import type { AppArtifact } from '../types';
 import { useTranslation, type TranslationKey } from '../i18n';
 import { useAppStore } from '../store/useAppStore';
+import { getCleanName } from '../utils/evaluator';
+import { G1_SKILLS, G2_SKILLS, G3_SKILLS, SKILL_MASTER_BY_BASE_ID } from '../data/skillMaster';
+import { translateSkill } from '../utils/skillMapping';
+import { useSkillFilter } from '../hooks/useSkillFilter';
+import { SkillFilterPopup } from '../components/SkillFilterPopup';
 
 export default function ListTab() {
     const { t, language } = useTranslation();
@@ -12,6 +17,18 @@ export default function ListTab() {
     const [filterAttr, setFilterAttr] = useState('');
     const [filterKind, setFilterKind] = useState('');
     const [filterStatus, setFilterStatus] = useState('');
+    const [filterSkill, setFilterSkill] = useState('');
+    const {
+        skillFilterFields,
+        skillFilterMySets,
+        saveSkillFilterFields,
+        saveMySet,
+        deleteMySet,
+        toggleMySetLock,
+        isSkillFilterOpen,
+        setIsSkillFilterOpen,
+        matchesSkillFilter
+    } = useSkillFilter();
     const [sortField, setSortField] = useState<keyof AppArtifact | 'inventoryOrder' | 'attr_kind' | 'memoText'>('inventoryOrder');
     const [sortAsc, setSortAsc] = useState(false);
 
@@ -32,60 +49,87 @@ export default function ListTab() {
     const conditions = useLiveQuery(() => db.conditions.toArray()) || [];
 
     const isLv5Search = /^(?:れべる|レベル|Level|Lv)\.?\s*[5５]$/i.test(searchTerm.trim());
+    const isStar5Search = /^(?:★|☆|ほし|ホシ|星|star)\.?\s*[5５]$/i.test(searchTerm.trim());
 
-    // Join memo data and sort/filter
-    const displayList = artifacts
-        .map(a => {
-            const memo = memos.find(m => m.id === a.id)?.memo || '';
-            return { ...a, memoText: memo };
-        })
-        .filter(a =>
-            (filterAttr === '' || a.attribute === filterAttr) &&
-            (filterKind === '' || a.kind === filterKind) &&
-            (filterStatus === '' ||
-                (filterStatus === 'fav' && a.is_locked) ||
-                (filterStatus === 'trash' && a.is_unnecessary) ||
-                (filterStatus === 'keep' && a.keepFlag) ||
-                (filterStatus === 'discard' && a.discardFlag) ||
-                (filterStatus === 'none' && !a.is_locked && !a.is_unnecessary && !a.keepFlag && !a.discardFlag)
-            ) &&
-            (
-                searchTerm === '' || (
-                    isLv5Search ? (
-                        [a.skill1_info?.level, a.skill2_info?.level, a.skill3_info?.level, a.skill4_info?.level].some(lvl => lvl === 5)
-                    ) : (
-                        String(a.id).includes(searchTerm) ||
-                        a.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        a.memoText.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        (a.skill1_info?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        (a.skill2_info?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        (a.skill3_info?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        (a.skill4_info?.name || '').toLowerCase().includes(searchTerm.toLowerCase())
+    // Memo lookup map for O(1) performance
+    const memoMap = useMemo(() => {
+        const map = new Map<number, string>();
+        memos.forEach(m => map.set(m.id, m.memo));
+        return map;
+    }, [memos]);
+
+    // Join memo data and sort/filter with useMemo to prevent unnecessary recalculations
+    const displayList = useMemo(() => {
+        return artifacts
+            .map(a => {
+                return { ...a, memoText: memoMap.get(a.id) || '' };
+            })
+            .filter(a =>
+                (filterAttr === '' || a.attribute === filterAttr) &&
+                (filterKind === '' || a.kind === filterKind) &&
+                (filterStatus === '' ||
+                    (filterStatus === 'fav' && a.is_locked) ||
+                    (filterStatus === 'trash' && a.is_unnecessary) ||
+                    (filterStatus === 'keep' && a.keepFlag) ||
+                    (filterStatus === 'discard' && a.discardFlag) ||
+                    (filterStatus === 'none' && !a.is_locked && !a.is_unnecessary && !a.keepFlag && !a.discardFlag)
+                ) &&
+                (
+                    searchTerm === '' || (
+                        isStar5Search ? (
+                            [a.skill1_info?.skill_quality, a.skill2_info?.skill_quality, a.skill3_info?.skill_quality, a.skill4_info?.skill_quality].some(q => q === 5)
+                        ) : isLv5Search ? (
+                            [a.skill1_info?.level, a.skill2_info?.level, a.skill3_info?.level, a.skill4_info?.level].some(lvl => lvl === 5)
+                        ) : (
+                            String(a.id).includes(searchTerm) ||
+                            a.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            a.memoText.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            (a.skill1_info?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            (a.skill2_info?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            (a.skill3_info?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            (a.skill4_info?.name || '').toLowerCase().includes(searchTerm.toLowerCase())
+                        )
                     )
+                ) &&
+                (
+                    filterSkill === '' ||
+                    (filterSkill === 'active' && matchesSkillFilter(a)) ||
+                    (filterSkill.startsWith('skill_') && (() => {
+                        const baseId = parseInt(filterSkill.replace('skill_', ''));
+                        const skillInfo = SKILL_MASTER_BY_BASE_ID.get(baseId);
+                        if (!skillInfo) return false;
+                        const targetName = getCleanName(skillInfo.name);
+                        return [a.skill1_info, a.skill2_info, a.skill3_info, a.skill4_info]
+                            .some(s => getCleanName(s?.name) === targetName);
+                    })())
                 )
             )
-        )
-        .sort((a, b) => {
-            if (sortField === 'attr_kind') {
-                const attrDiff = parseInt(a.attribute) - parseInt(b.attribute);
-                if (attrDiff !== 0) return sortAsc ? attrDiff : -attrDiff;
-                const kindDiff = parseInt(a.kind) - parseInt(b.kind);
-                return sortAsc ? kindDiff : -kindDiff;
-            }
-            let valA: any = sortField === 'memoText' ? a.memoText : a[sortField as keyof AppArtifact];
-            let valB: any = sortField === 'memoText' ? b.memoText : b[sortField as keyof AppArtifact];
-            if (valA === undefined) valA = sortField === 'inventoryOrder' ? Number.MAX_SAFE_INTEGER : 0;
-            if (valB === undefined) valB = sortField === 'inventoryOrder' ? Number.MAX_SAFE_INTEGER : 0;
+            .sort((a, b) => {
+                if (sortField === 'attr_kind') {
+                    const attrDiff = parseInt(a.attribute) - parseInt(b.attribute);
+                    if (attrDiff !== 0) return sortAsc ? attrDiff : -attrDiff;
+                    const kindDiff = parseInt(a.kind) - parseInt(b.kind);
+                    return sortAsc ? kindDiff : -kindDiff;
+                }
+                let valA: any = sortField === 'memoText' ? a.memoText : a[sortField as keyof AppArtifact];
+                let valB: any = sortField === 'memoText' ? b.memoText : b[sortField as keyof AppArtifact];
+                if (valA === undefined) valA = sortField === 'inventoryOrder' ? Number.MAX_SAFE_INTEGER : 0;
+                if (valB === undefined) valB = sortField === 'inventoryOrder' ? Number.MAX_SAFE_INTEGER : 0;
 
-            // inventoryOrderでのソート時に値が同じ（または両方未定義の値）であれば、ID降順にフォールバック
-            if (sortField === 'inventoryOrder' && valA === valB) {
-                return sortAsc ? a.id - b.id : b.id - a.id;
-            }
+                // inventoryOrderでのソート時に値が同じ（または両方未定義の値）であれば、ID降順にフォールバック
+                if (sortField === 'inventoryOrder' && valA === valB) {
+                    return sortAsc ? a.id - b.id : b.id - a.id;
+                }
 
-            if (valA < valB) return sortAsc ? -1 : 1;
-            if (valA > valB) return sortAsc ? 1 : -1;
-            return 0;
-        });
+                if (valA < valB) return sortAsc ? -1 : 1;
+                if (valA > valB) return sortAsc ? 1 : -1;
+                return 0;
+            });
+    }, [
+        artifacts, memoMap,
+        searchTerm, filterAttr, filterKind, filterStatus, filterSkill,
+        sortField, sortAsc, isLv5Search, isStar5Search, matchesSkillFilter
+    ]);
 
     const updateMemo = async (id: number, memoText: string) => {
         await db.memos.put({ id, memo: memoText });
@@ -115,7 +159,37 @@ export default function ListTab() {
     // reset page to 1 if filter changes
     useEffect(() => {
         setCurrentPage(1);
-    }, [searchTerm, filterAttr, filterKind, filterStatus, sortField, sortAsc, pageSize]);
+    }, [searchTerm, filterAttr, filterKind, filterStatus, filterSkill, skillFilterFields, sortField, sortAsc, pageSize]);
+
+    // Keyboard navigation for pages
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
+                return;
+            }
+            if (isSkillFilterOpen) {
+                return;
+            }
+
+            const activeEl = document.activeElement;
+            const listContainer = document.getElementById('list-scroll-container');
+            if (listContainer && (activeEl === listContainer || listContainer.contains(activeEl))) {
+                if (listContainer.scrollWidth > listContainer.clientWidth) {
+                    // リストがアクティブかつ横スクロール可能な場合はページ送りをせずスクロールを優先する
+                    return;
+                }
+            }
+            
+            if (e.key === 'ArrowLeft') {
+                setCurrentPage(c => Math.max(1, c - 1));
+            } else if (e.key === 'ArrowRight') {
+                setCurrentPage(c => Math.min(totalPages, c + 1));
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [totalPages, isSkillFilterOpen]);
 
     const theme = useAppStore(state => state.globalSettings?.design?.theme) || 'dark';
 
@@ -168,6 +242,36 @@ export default function ListTab() {
                     <option value="none">{language === 'en' ? 'None' : 'ラベルなし'}</option>
                 </select>
 
+                {/* Skill filter */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                    <select className="input" style={{ padding: '0.4rem 0.6rem', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                        value={filterSkill}
+                        onChange={e => { setFilterSkill(e.target.value); setCurrentPage(1); }}>
+                        <option value="">{language === 'en' ? 'Skill: All' : 'スキル: すべて'}</option>
+                        <option value="active">{language === 'en' ? 'Skill Filter Active' : 'スキルフィルター有効'}</option>
+                        <optgroup label={language === 'en' ? '── Gr [I] ──' : '── Gr [Ⅰ] ──'}>
+                            {G1_SKILLS.map(s => (
+                                <option key={s.baseId} value={`skill_${s.baseId}`}>{translateSkill(s.name, language)}</option>
+                            ))}
+                        </optgroup>
+                        <optgroup label={language === 'en' ? '── Gr [II] ──' : '── Gr [Ⅱ] ──'}>
+                            {G2_SKILLS.map(s => (
+                                <option key={s.baseId} value={`skill_${s.baseId}`}>{translateSkill(s.name, language)}</option>
+                            ))}
+                        </optgroup>
+                        <optgroup label={language === 'en' ? '── Gr [III] ──' : '── Gr [Ⅲ] ──'}>
+                            {G3_SKILLS.map(s => (
+                                <option key={s.baseId} value={`skill_${s.baseId}`}>{translateSkill(s.name, language)}</option>
+                            ))}
+                        </optgroup>
+                    </select>
+                    <button className="btn btn-ghost" style={{ padding: '0.4rem', borderRadius: '6px' }}
+                        onClick={() => setIsSkillFilterOpen(true)}
+                        title={language === 'en' ? 'Skill Filter Settings' : 'スキルフィルター設定'}>
+                        <SettingsIcon size={16} />
+                    </button>
+                </div>
+
                 <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
                     <div style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-main)' }}>
                         {language === 'en' ? 'Showing: ' : '表示件数: '}{displayList.length} / {artifacts.length}
@@ -206,7 +310,7 @@ export default function ListTab() {
             )}
 
             {/* Table Area */}
-            <div className="glass-panel" style={{ flex: 1, overflow: 'auto', borderRadius: '12px' }}>
+            <div id="list-scroll-container" tabIndex={-1} className="glass-panel" style={{ flex: 1, overflow: 'auto', borderRadius: '12px', outline: 'none' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '900px' }}>
                     <thead style={{ position: 'sticky', top: 0, background: 'var(--panel-bg)', backdropFilter: 'blur(10px)', zIndex: 1 }}>
                         <tr>
@@ -319,6 +423,20 @@ export default function ListTab() {
                     </div>
                 </div>
             )}
+
+            {/* Skill Filter Popup */}
+            <SkillFilterPopup
+                isOpen={isSkillFilterOpen}
+                onClose={() => setIsSkillFilterOpen(false)}
+                skillFilterFields={skillFilterFields}
+                saveSkillFilterFields={saveSkillFilterFields}
+                skillFilterMySets={skillFilterMySets}
+                saveMySet={saveMySet}
+                deleteMySet={deleteMySet}
+                toggleMySetLock={toggleMySetLock}
+                language={language}
+                theme={theme}
+            />
         </div>
     );
 }

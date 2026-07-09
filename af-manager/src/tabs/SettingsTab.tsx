@@ -8,6 +8,7 @@ import { exportDatabase, importDatabase, exportMemos, importMemos, exportConditi
 import { G1_SKILLS, G2_SKILLS, G3_SKILLS } from '../data/skillMaster';
 import { evaluateArtifact } from '../utils/evaluator';
 import { runDiscardCalc } from '../utils/discardCalc';
+import { alertUnnecessaryKeeps } from '../utils/alertUnnecessaryKeeps';
 import { useAppStore } from '../store/useAppStore';
 import { useTranslation, type TranslationKey } from '../i18n';
 import { translateSkill, truncateSkill } from '../utils/skillMapping';
@@ -324,6 +325,7 @@ export default function SettingsTab() {
             } else {
                 showToast(msg, 'info');
             }
+            await alertUnnecessaryKeeps(language);
         } catch (e) {
             console.error(e);
             showToast(language === 'en' ? 'An error occurred.' : 'エラーが発生しました。', 'error');
@@ -384,13 +386,20 @@ export default function SettingsTab() {
         const newSettings = { ...settings, design: newDesign };
         setSettings(newSettings); // Update React state first
         if (persist) {
-            db.settings.put(newSettings).catch(console.error); // Persist only if requested
+            // Always read from DB to avoid overwriting fields managed elsewhere (e.g. skillFilterFields)
+            db.settings.get('global').then(latest => {
+                const base = latest ?? settings;
+                db.settings.put({ ...base, design: newDesign }).catch(console.error);
+            });
         }
     };
     const resetDesign = () => {
         const newSettings = { ...settings, design: { ...DEFAULT_DESIGN }, pageLimit: 10 };
-        setSettings(newSettings); // Update React state first
-        db.settings.put(newSettings).catch(console.error); // Persist in background
+        setSettings(newSettings);
+        db.settings.get('global').then(latest => {
+            const base = latest ?? settings;
+            db.settings.put({ ...base, design: { ...DEFAULT_DESIGN }, pageLimit: 10 }).catch(console.error);
+        });
     };
 
 
@@ -1269,6 +1278,111 @@ export default function SettingsTab() {
                         />
                         <span><strong>{language === 'en' ? 'Protect AFs with Lv5 Skills' : 'Lv5スキル持ちのAFを保護'}</strong><br /><span style={{ fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)' }}>{language === 'en' ? 'Excludes AFs that have at least one level 5 skill.' : 'いずれかのスキルがLv5まで強化されているAFを廃棄候補から除外します。'}</span></span>
                     </label>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.8rem', cursor: 'pointer', fontSize: 'var(--font-size-main)' }}>
+                            <input type="checkbox" style={{ marginTop: '3px' }}
+                                checked={settings.discardBehavior.protectQuality5Skills ?? false}
+                                onChange={e => updateDiscardSettings({ protectQuality5Skills: e.target.checked })}
+                            />
+                            <span><strong>{language === 'en' ? 'Protect AFs with ☆5 Skills' : '☆5スキル持ちのAFを保護'}</strong><br /><span style={{ fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)' }}>{language === 'en' ? 'Excludes AFs that have at least one skill with a maximum initial value (☆5).' : 'いずれかのスキルの初期値が最高値（☆5）のAFを廃棄候補から除外します。'}</span></span>
+                        </label>
+
+                        {settings.discardBehavior.protectQuality5Skills && (
+                            <div style={{ marginLeft: '1.8rem', display: 'flex', flexDirection: 'column', gap: '0.8rem', background: 'var(--grid-item-bg)', padding: '0.8rem 1rem', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
+                                <div style={{ display: 'flex', gap: '1.5rem' }}>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
+                                        <input type="radio" 
+                                            checked={(settings.discardBehavior.protectQuality5Method ?? 'all') === 'all'}
+                                            onChange={() => updateDiscardSettings({ protectQuality5Method: 'all' })}
+                                        />
+                                        <span>{language === 'en' ? 'All Skills' : 'すべてのスキル'}</span>
+                                    </label>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
+                                        <input type="radio" 
+                                            checked={settings.discardBehavior.protectQuality5Method === 'specific'}
+                                            onChange={() => updateDiscardSettings({ protectQuality5Method: 'specific' })}
+                                        />
+                                        <span>{language === 'en' ? 'Specific Skills Only' : '特定のスキルのみ'}</span>
+                                    </label>
+                                </div>
+
+                                {settings.discardBehavior.protectQuality5Method === 'specific' && (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+                                        <div style={{ 
+                                            border: '1px solid var(--panel-border)', 
+                                            borderRadius: '8px', 
+                                            padding: '0.6rem', 
+                                            resize: 'vertical', 
+                                            overflow: 'hidden', 
+                                            minHeight: '100px', 
+                                            maxHeight: '400px',
+                                            background: 'rgba(255,255,255,0.01)', 
+                                            display: 'flex',
+                                            flexDirection: 'column'
+                                        }}>
+                                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem', overflowY: 'auto', padding: '2px' }}>
+                                                {(settings.discardBehavior.protectedQuality5SkillsList || []).map((item, idx) => {
+                                                    const updateItem = (newBaseId: number) => {
+                                                        const newList = [...(settings.discardBehavior.protectedQuality5SkillsList || [])];
+                                                        let newGroup = 1;
+                                                        const found = [...G1_SKILLS, ...G2_SKILLS, ...G3_SKILLS].find(s => s.baseId === newBaseId);
+                                                        if (found) {
+                                                            if (G1_SKILLS.some(s => s.baseId === newBaseId)) newGroup = 1;
+                                                            else if (G2_SKILLS.some(s => s.baseId === newBaseId)) newGroup = 2;
+                                                            else if (G3_SKILLS.some(s => s.baseId === newBaseId)) newGroup = 3;
+                                                        }
+                                                        newList[idx] = { conditionGroup: newGroup, conditionSkillName: newBaseId };
+                                                        updateDiscardSettings({ protectedQuality5SkillsList: newList });
+                                                    };
+
+                                                    const removeItem = () => {
+                                                        const newList = settings.discardBehavior.protectedQuality5SkillsList!.filter((_, i) => i !== idx);
+                                                        updateDiscardSettings({ protectedQuality5SkillsList: newList });
+                                                    };
+
+                                                    return (
+                                                        <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                            <select className="input" style={{ flex: 1, padding: '0.2rem', paddingRight: '1.2rem', fontSize: 'var(--font-size-sub)', minWidth: '100px' }}
+                                                                value={item.conditionSkillName || ""}
+                                                                onChange={e => updateItem(Number(e.target.value) || 0)}
+                                                            >
+                                                                <option value="">--</option>
+                                                                <optgroup label="Gr [I]">
+                                                                    {G1_SKILLS.filter(s => s.fixedQuality !== 1).map(s => <option key={s.baseId} value={s.baseId}>{translateSkill(s.name, language)}</option>)}
+                                                                </optgroup>
+                                                                <optgroup label="Gr [II]">
+                                                                    {G2_SKILLS.filter(s => s.fixedQuality !== 1).map(s => <option key={s.baseId} value={s.baseId}>{translateSkill(s.name, language)}</option>)}
+                                                                </optgroup>
+                                                            </select>
+                                                            <button className="btn btn-ghost" style={{ padding: '0.3rem', color: 'var(--accent-danger)' }} onClick={removeItem} title={language === 'en' ? 'Remove' : '削除'}>
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                        <button className="btn" style={{ 
+                                            alignSelf: 'flex-start', padding: '0.3rem 0.8rem', fontSize: 'var(--font-size-sub)', 
+                                            display: 'flex', alignItems: 'center', gap: '0.4rem',
+                                            background: currentDesign.theme === 'dark' ? 'rgba(255,255,255,0.1)' : undefined,
+                                            border: currentDesign.theme === 'dark' ? '1px solid rgba(255,255,255,0.2)' : undefined,
+                                            color: currentDesign.theme === 'dark' ? '#fff' : undefined
+                                        }}
+                                            onClick={() => {
+                                                const newList = [...(settings.discardBehavior.protectedQuality5SkillsList || [])];
+                                                newList.push({ conditionGroup: 1, conditionSkillName: '' });
+                                                updateDiscardSettings({ protectedQuality5SkillsList: newList });
+                                            }}
+                                        >
+                                            <Plus size={14} /> {language === 'en' ? 'Add Skill' : 'スキルを追加'}
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 <div style={{ marginBottom: '1.5rem', background: 'var(--grid-item-bg)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
@@ -1720,7 +1834,8 @@ export default function SettingsTab() {
                                 const val = Math.max(1, Math.min(60, parseInt(e.target.value) || 3));
                                 const newSettings = { ...settings, notificationDuration: val };
                                 setSettings(newSettings);
-                                db.settings.put(newSettings).catch(console.error);
+                                const latest = await db.settings.get('global');
+                                db.settings.put({ ...(latest ?? settings), notificationDuration: val }).catch(console.error);
                             }}
                         />
                     </div>
@@ -1745,7 +1860,8 @@ export default function SettingsTab() {
                                 const val = Math.max(1, Math.min(10, parseInt(e.target.value) || 1));
                                 const newSettings = { ...settings, notificationMaxCount: val };
                                 setSettings(newSettings);
-                                db.settings.put(newSettings).catch(console.error);
+                                const latest = await db.settings.get('global');
+                                db.settings.put({ ...(latest ?? settings), notificationMaxCount: val }).catch(console.error);
                             }}
                         />
                     </div>
@@ -1790,11 +1906,12 @@ export default function SettingsTab() {
                     <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.7rem', cursor: 'pointer', fontSize: 'var(--font-size-main)', fontWeight: 600 }}>
                         <input type="checkbox" style={{ marginTop: '4px' }}
                             checked={settings.saveWindowState ?? true}
-                            onChange={e => {
+                            onChange={async e => {
                                 const enabled = e.target.checked;
                                 const newSettings = { ...settings, saveWindowState: enabled };
                                 setSettings(newSettings);
-                                db.settings.put(newSettings).catch(console.error);
+                                const latest = await db.settings.get('global');
+                                db.settings.put({ ...(latest ?? settings), saveWindowState: enabled }).catch(console.error);
                                 // バックエンド側の設定ファイルも更新（次回起動時に反映）
                                 invoke('set_window_state_enabled', { enabled }).catch(console.error);
                             }} />

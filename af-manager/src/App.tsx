@@ -14,6 +14,7 @@ import ReferenceTab from './tabs/ReferenceTab';
 import { db } from './db';
 import { runCriteriaMatcher } from './utils/matcher';
 import { runDiscardCalc } from './utils/discardCalc';
+import { alertUnnecessaryKeeps } from './utils/alertUnnecessaryKeeps';
 import { useAppStore } from './store/useAppStore';
 import { DEFAULT_DESIGN, type AppDesignSettings } from './types';
 import { useTranslation } from './i18n';
@@ -45,6 +46,7 @@ async function handleKeepCalc(language: string) {
     await db.artifacts.bulkPut(updated);
     const keptCount = updated.filter(a => a.keepFlag).length;
     useAppStore.getState().showToast(language === 'en' ? `Calculation complete.\nKept: ${keptCount} item(s)` : `確保フラグの一括計算が完了しました。\n確保対象: ${keptCount}件`, 'success');
+    await alertUnnecessaryKeeps(language);
   } catch (e) {
     console.error(e);
     useAppStore.getState().showToast(language === 'en' ? 'An error occurred.' : 'エラーが発生しました。', 'error');
@@ -57,6 +59,7 @@ async function handleDiscardCalc(language: string) {
     if (!settings) { useAppStore.getState().showToast(language === 'en' ? 'Settings not found.' : '設定が見つかりません。', 'error'); return; }
     const msg = await runDiscardCalc(settings, language);
     useAppStore.getState().showToast(msg, 'info');
+    await alertUnnecessaryKeeps(language);
   } catch (e) {
     console.error(e);
     useAppStore.getState().showToast(language === 'en' ? 'An error occurred.' : 'エラーが発生しました。', 'error');
@@ -282,7 +285,7 @@ function AppInner() {
           opacity: collapsed ? 0 : 0.7, height: '12px',
           transition: 'opacity 0.22s ease'
         }}>
-          v{import.meta.env.VITE_APP_VERSION || '1.0.7'}
+          v{import.meta.env.VITE_APP_VERSION || '1.0.8'}
         </div>
       </aside>
 

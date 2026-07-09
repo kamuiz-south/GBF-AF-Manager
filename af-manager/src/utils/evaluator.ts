@@ -6,7 +6,7 @@ export function isRareArtifact(artifact: AppArtifact): boolean {
 }
 
 // Helper to extract the actual base name without any sub-member text suffix
-const getCleanName = (name?: string) => {
+export const getCleanName = (name?: string) => {
     if (!name) return "";
     // Cut off at the fullwidth space + diamond, or any similar delimiter
     return name.split("　◆")[0].split(" ◆")[0].trim();

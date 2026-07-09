@@ -65,8 +65,8 @@ export const SKILL_MASTER: SkillInfo[] = [
     { baseId: 2161, name: '通常攻撃ダメージ上限UP/アビリティダメージ上限-80％/奥義ダメージ上限-60％', group: 2 },
     { baseId: 2171, name: 'アビリティダメージ上限UP/通常攻撃ダメージ上限-20％/奥義ダメージ上限-60％', group: 2 },
     { baseId: 2181, name: '奥義ダメージ上限UP/通常攻撃ダメージ上限-20％/アビリティダメージ上限-80％', group: 2 },
-    { baseId: 2191, name: '確率で強化効果が無効化されない', group: 2 },
-    { baseId: 2201, name: '確率で攻撃開始時に自分の弱体効果を1つ回復', group: 2 },
+    { baseId: 2191, name: '確率で強化効果が無効化されない', group: 2, fixedQuality: 1 },
+    { baseId: 2201, name: '確率で攻撃開始時に自分の弱体効果を1つ回復', group: 2, fixedQuality: 1 },
 
     // ─── G3 Skills (S4) — All 29 from G3.txt ────────────────────
     { baseId: 5002, name: '弱体アビリティ使用時、敵に被ダメージUP(2回)', group: 3, fixedQuality: 1 },

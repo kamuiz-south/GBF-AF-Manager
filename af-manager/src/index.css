@@ -6,7 +6,7 @@
     radial-gradient(circle at 90% 80%, rgba(124, 58, 237, 0.12) 0%, transparent 40%);
   --panel-bg: rgba(20, 24, 34, 0.65);
   --panel-bg-hover: rgba(30, 36, 50, 0.7);
-  --panel-border: rgba(255, 255, 255, 0.06);
+  --panel-border: rgba(255, 255, 255, 0.15); /* Increased from 0.06 to 0.15 for better visibility */
   --text-main: #f1f5f9;
   --text-muted: #94a3b8;
   --accent-blue: #3b82f6;
@@ -33,7 +33,7 @@
   --group-inner-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.15);
   --criteria-detail-bg: rgba(0, 0, 0, 0.2);
   --dim-bg: rgba(255, 255, 255, 0.05);
-  --dim-border: rgba(255, 255, 255, 0.1);
+  --dim-border: rgba(255, 255, 255, 0.2); /* Increased from 0.1 to 0.2 */
   --weapon-text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
   --criteria-new-bg: rgba(0, 0, 0, 0.3);
   --skill-name-color: #fff;

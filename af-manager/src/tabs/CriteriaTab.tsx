@@ -5,6 +5,7 @@ import { db } from '../db';
 import type { AppArtifact, Condition, ConditionGroup } from '../types';
 import { DEFAULT_DESIGN } from '../types';
 import { runCriteriaMatcher } from '../utils/matcher';
+import { alertUnnecessaryKeeps } from '../utils/alertUnnecessaryKeeps';
 import { useTranslation, type TranslationKey } from '../i18n';
 import { useAppStore } from '../store/useAppStore';
 import { translateSkill, reverseTranslateSkill } from '../utils/skillMapping';
@@ -312,6 +313,7 @@ export default function CriteriaTab() {
             const updated = runCriteriaMatcher(allArtifacts, conditions);
             await db.artifacts.bulkPut(updated);
             showToast(language === 'en' ? 'Calculations complete, keep flags updated!' : '計算を実行し、確保フラグを更新しました！', 'success');
+            await alertUnnecessaryKeeps(language);
         } catch (e) {
             console.error(e);
             showToast(language === 'en' ? 'An error occurred during calculation.' : '計算中にエラーが発生しました。', 'error');

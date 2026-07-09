@@ -36,7 +36,18 @@ export default function HelpTab() {
                 </p>
             </header>
 
-            {/* ── データ取得 ──────────── */}
+            {/* ── 簡易ガイド ──────────── */}
+            <Section title={language === 'en' ? 'Quick Start Guide' : '簡易ガイド'} icon={<List size={18} />}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'var(--dim-bg)', padding: '1rem', borderRadius: '8px' }}>
+                    <Step n={1}>{language === 'en' ? 'Get AF Data (from the bundled extension or Data Acquisition tab)' : 'AFデータを取得（同梱の拡張機能かAFデータ取得タブから）'}</Step>
+                    <Step n={2}>{language === 'en' ? 'Set Keep and Discard Criteria (Discard settings are in the Settings tab)' : '確保条件と廃棄条件を設定（廃棄設定は設定タブ内に）'}</Step>
+                    <Step n={3}>{language === 'en' ? 'Apply Keep and Discard Flags (via bottom-left buttons, or calculate buttons in each tab)' : '確保フラグと廃棄フラグをつける（左下ボタン、または各タブの計算ボタンから）'}</Step>
+                    <Step n={4}>{language === 'en' ? 'Register trash or favorites in GBF while comparing with the Game UI Tab (Confirm carefully to avoid misclicks!)' : 'ゲーム内UIタブと見比べながら、グラブルで不用品やお気に入りの登録を行う（押し間違えるので確認大事！）'}</Step>
+                    <Step n={5}>{language === 'en' ? '(Recommended) Re-acquire AF data to confirm no Keep-suggested AFs were accidentally trashed' : '（おすすめ）再度AFデータを取得しなおして、確保提案AFを不用品にしていないか確認'}</Step>
+                    <Step n={6}>{language === 'en' ? 'Dismantle trash AFs in GBF' : 'グラブルで不用品のAFを分解'}</Step>
+                </div>
+            </Section>
+
             {/* ── データ取得 ──────────── */}
             <Section title={language === 'en' ? 'Data Acquisition Tab' : 'AFデータ取得タブ'} icon={<Database size={18} />}>
                 <p style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-main)', marginBottom: '1rem', lineHeight: 1.6 }}>
@@ -205,7 +216,7 @@ export default function HelpTab() {
                         },
                         {
                             q: language === 'en' ? 'AF Collector cannot collect' : 'AF Collectorで収集できない',
-                            a: language === 'en' ? 'Reload the page once, navigate back to the Artifact list and try collecting again. It is okay to navigate multiple pages while collecting. Note: the page displayed when you press "Start Collecting" is not captured — collection begins from the next page you navigate to.' : '一度リロードを行ったのち、アーティファクト一覧画面へ移動してから収集開始してみてください。収集中は同じページを横断しても問題ありません。なお、「収集開始」を押した時点で表示されているページは取得対象になりません。ボタンを押した後に頂から順にページを送ってください。'
+                            a: language === 'en' ? 'Reload the page once, navigate back to the Artifact list and try collecting again. It is okay to navigate multiple pages while collecting. Note: the page displayed when you press "Start Collecting" is not captured — collection begins from the next page you navigate to.' : '一度リロードを行ったのち、アーティファクト一覧画面へ移動してから収集開始してみてください。収集中は同じページを横断しても問題ありません。なお、「収集開始」を押した時点で表示されているページは取得対象になりません。ボタンを押した後に1ページ目から順にページを送ってください。'
                         },
                         {
                             q: language === 'en' ? 'Extension data is not reaching the app' : '拡張機能のデータがアプリに届かない',

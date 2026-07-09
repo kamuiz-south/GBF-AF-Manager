@@ -1,6 +1,7 @@
 import { db } from '../db';
 import type { Settings } from '../types';
-import { evaluateArtifact, isRareArtifact } from './evaluator';
+import { evaluateArtifact, isRareArtifact, getCleanName } from './evaluator';
+import { G1_SKILLS, G2_SKILLS, G3_SKILLS } from '../data/skillMaster';
 
 /**
  * Runs the full discard-flag calculation:
@@ -45,6 +46,38 @@ export async function runDiscardCalc(settings: Settings, language: string = 'ja'
         const eq = (a as any).equip_npc_info;
         const isEquippedAF = eq && !Array.isArray(eq) && typeof eq === 'object';
         const hasLv5Skill = a.skill1_info?.level >= 5 || a.skill2_info?.level >= 5 || a.skill3_info?.level >= 5 || a.skill4_info?.level >= 5;
+        
+        let hasProtectedQuality5Skill = false;
+        if (b.protectQuality5Skills) {
+            if (b.protectQuality5Method === 'specific' && Array.isArray(b.protectedQuality5SkillsList)) {
+                const findName = (idOrName: string | number, group: number) => {
+                    if (!idOrName) return "";
+                    if (typeof idOrName === 'string' && isNaN(Number(idOrName))) return idOrName;
+                    const fromMaster = (group === 1 ? G1_SKILLS : group === 2 ? G2_SKILLS : G3_SKILLS).find(s => s.baseId === Number(idOrName));
+                    return fromMaster ? fromMaster.name : "";
+                };
+
+                const targetNames = b.protectedQuality5SkillsList.map(s => findName(s.conditionSkillName, s.conditionGroup)).filter(Boolean);
+
+                const skills = [
+                    { info: a.skill1_info, cleanName: getCleanName(a.skill1_info?.name) },
+                    { info: a.skill2_info, cleanName: getCleanName(a.skill2_info?.name) },
+                    { info: a.skill3_info, cleanName: getCleanName(a.skill3_info?.name) },
+                    { info: a.skill4_info, cleanName: getCleanName(a.skill4_info?.name) }
+                ];
+
+                hasProtectedQuality5Skill = skills.some(s => 
+                    s.info && Number(s.info.skill_quality) === 5 && targetNames.includes(s.cleanName)
+                );
+            } else {
+                hasProtectedQuality5Skill = 
+                    Number(a.skill1_info?.skill_quality) === 5 || 
+                    Number(a.skill2_info?.skill_quality) === 5 || 
+                    Number(a.skill3_info?.skill_quality) === 5 || 
+                    Number(a.skill4_info?.skill_quality) === 5;
+            }
+        }
+
         const isProtected =
             ((b.protectLocked ?? true) && a.is_locked) ||
             ((b.protectKeepFlag ?? true) && !!a.keepFlag) ||
@@ -52,6 +85,7 @@ export async function runDiscardCalc(settings: Settings, language: string = 'ja'
             ((b.protectEquipped ?? true) && isEquippedAF) ||
             ((b.protectMemos ?? true) && memoIds.has(a.id)) ||
             ((b.protectLv5Skills ?? true) && hasLv5Skill) ||
+            hasProtectedQuality5Skill ||
             (b.protectedAttributes?.includes(a.attribute.toString()) ?? false);
 
         if (isProtected) {
