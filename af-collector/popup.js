@@ -78,11 +78,13 @@ function render(p) {
             progressWrap.style.display = total ? 'block' : 'none';
             if (total) progressBar.style.width = `${Math.min(100, receivedCount / total * 100)}%`;
             btnDl.style.display = '';
+            btnStart.innerHTML = chrome.i18n.getMessage('btnResume');
         } else {
             statusText.textContent = chrome.i18n.getMessage('statusWaiting');
             pagesLabel.textContent = '';
             progressWrap.style.display = 'none';
             btnDl.style.display = 'none';
+            btnStart.innerHTML = chrome.i18n.getMessage('btnStart');
         }
         completeBanner.style.display = 'none';
         btnStart.style.display = '';
@@ -169,10 +171,8 @@ function showFilterWarning(filterData) {
     }
 }
 
-// ---------- ボタン操作 ----------
 btnStart.addEventListener('click', () => {
     chrome.runtime.sendMessage({ type: 'START_COLLECTING' });
-    render({ collecting: true, total: null, receivedCount: 0, receivedPages: [], complete: false });
 });
 
 btnStop.addEventListener('click', () => {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { AlertTriangle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Heart, Package, Star, Trash2, Unlock, User, Settings as SettingsIcon } from 'lucide-react';
 import { db } from '../db';
@@ -124,6 +124,39 @@ export default function GridTab() {
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [totalPages, isSkillFilterOpen]);
+
+    const gridRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const el = gridRef.current;
+        if (!el) return;
+
+        let wheelTimeout: number | null = null;
+        const handleWheel = (e: WheelEvent) => {
+            const isScrollingDown = e.deltaY > 0;
+            const isScrollingUp = e.deltaY < 0;
+
+            // Allow default scroll if attempting to scroll beyond boundaries
+            if (isScrollingUp && currentPage === 0) return;
+            if (isScrollingDown && currentPage >= totalPages - 1) return;
+
+            e.preventDefault(); // Stop window scrolling
+
+            if (wheelTimeout !== null) return;
+            wheelTimeout = window.setTimeout(() => {
+                wheelTimeout = null;
+            }, 10);
+
+            if (isScrollingDown) {
+                setCurrentPage(c => Math.min(totalPages - 1, c + 1));
+            } else if (isScrollingUp) {
+                setCurrentPage(c => Math.max(0, c - 1));
+            }
+        };
+
+        el.addEventListener('wheel', handleWheel, { passive: false });
+        return () => el.removeEventListener('wheel', handleWheel);
+    }, [currentPage, totalPages]);
 
     const settings = useLiveQuery(() => db.settings.get('global'));
     const noMaxHeight = settings?.design?.gridDetailNoMaxHeight;
@@ -274,7 +307,9 @@ export default function GridTab() {
                         </button>
                     )}
                 </div>
-                <div style={{
+                <div 
+                    ref={gridRef}
+                    style={{
                     display: 'grid',
                     gridTemplateColumns: 'repeat(5, 1fr)',
                     gridTemplateRows: 'repeat(4, 1fr)',

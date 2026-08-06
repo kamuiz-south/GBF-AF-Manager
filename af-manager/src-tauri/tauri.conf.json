@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "GBF AF Manager",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "identifier": "jp.af-manager.app",
   "build": {
     "frontendDist": "../dist",
@@ -20,6 +20,11 @@
       "msi",
       "nsis"
     ],
+    "windows": {
+      "nsis": {
+        "template": "installer.nsi"
+      }
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

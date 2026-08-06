@@ -252,15 +252,9 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
         case 'START_COLLECTING': {
             state.collecting = true;
-            state.total = null;
-            state.received = new Map();
-            state.filterWarning = false;
-            state.filterChecked = false;
-            state.lastFilter = null;
-            chrome.action.setBadgeText({ text: '…' });
-            chrome.action.setBadgeBackgroundColor({ color: '#3b82f6' });
             saveState();
             notifyAllGBFTabs(true);
+            broadcastProgress();
             sendResponse({ ok: true });
             break;
         }

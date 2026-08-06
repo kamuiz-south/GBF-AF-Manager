@@ -16,7 +16,7 @@
         "description": "Status message while collecting"
     },
     "statusStopped": {
-        "message": "停止",
+        "message": "一時停止",
         "description": "Status message when stopped"
     },
     "statusComplete": {
@@ -36,8 +36,12 @@
         "description": "Button to start collection"
     },
     "btnStop": {
-        "message": "■ 停止",
+        "message": "■ 一時停止",
         "description": "Button to stop collection"
+    },
+    "btnResume": {
+        "message": "▶ 収集再開",
+        "description": "Button to resume collection"
     },
     "btnDl": {
         "message": "⬇ ダウンロード",

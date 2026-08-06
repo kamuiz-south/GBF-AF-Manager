@@ -1,4 +1,4 @@
-import { BookOpen, Database, List, Grid, Filter, Settings as SettingsIcon, Heart, Trash2, Star, ChevronRight, Package } from 'lucide-react';
+import { BookOpen, Database, List, Grid, Filter, Settings as SettingsIcon, Heart, Trash2, Star, ChevronRight, Package, AlertTriangle } from 'lucide-react';
 import { useTranslation } from '../i18n';
 
 const Section = ({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) => (
@@ -23,6 +23,16 @@ const Note = ({ children }: { children: React.ReactNode }) => (
     </div>
 );
 
+const Sub = ({ children }: { children: React.ReactNode }) => (
+    <span style={{ opacity: 0.7, fontSize: '0.9em', marginLeft: '0.4rem' }}>{children}</span>
+);
+
+const Tag = ({ children }: { children: React.ReactNode }) => (
+    <span style={{ padding: '0.1rem 0.4rem', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--dim-border)', borderRadius: '4px', fontSize: '0.85em', marginRight: '0.4rem', opacity: 0.9, fontWeight: 'normal' }}>
+        {children}
+    </span>
+);
+
 export default function HelpTab() {
     const { language } = useTranslation();
     return (
@@ -39,11 +49,31 @@ export default function HelpTab() {
             {/* ── 簡易ガイド ──────────── */}
             <Section title={language === 'en' ? 'Quick Start Guide' : '簡易ガイド'} icon={<List size={18} />}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'var(--dim-bg)', padding: '1rem', borderRadius: '8px' }}>
-                    <Step n={1}>{language === 'en' ? 'Get AF Data (from the bundled extension or Data Acquisition tab)' : 'AFデータを取得（同梱の拡張機能かAFデータ取得タブから）'}</Step>
-                    <Step n={2}>{language === 'en' ? 'Set Keep and Discard Criteria (Discard settings are in the Settings tab)' : '確保条件と廃棄条件を設定（廃棄設定は設定タブ内に）'}</Step>
-                    <Step n={3}>{language === 'en' ? 'Apply Keep and Discard Flags (via bottom-left buttons, or calculate buttons in each tab)' : '確保フラグと廃棄フラグをつける（左下ボタン、または各タブの計算ボタンから）'}</Step>
-                    <Step n={4}>{language === 'en' ? 'Register trash or favorites in GBF while comparing with the Game UI Tab (Confirm carefully to avoid misclicks!)' : 'ゲーム内UIタブと見比べながら、グラブルで不用品やお気に入りの登録を行う（押し間違えるので確認大事！）'}</Step>
-                    <Step n={5}>{language === 'en' ? '(Recommended) Re-acquire AF data to confirm no Keep-suggested AFs were accidentally trashed' : '（おすすめ）再度AFデータを取得しなおして、確保提案AFを不用品にしていないか確認'}</Step>
+                    <Step n={1}>
+                        {language === 'en' 
+                            ? <>Get AF Data <Sub>from the bundled extension or Data Acquisition tab</Sub></>
+                            : <>AFデータを取得 <Sub>同梱の拡張機能かAFデータ取得タブから</Sub></>}
+                    </Step>
+                    <Step n={2}>
+                        {language === 'en' 
+                            ? <>Set Keep and Discard Criteria <Sub>Discard settings are in the Settings tab</Sub></>
+                            : <>確保条件と廃棄条件を設定 <Sub>廃棄設定は設定タブ内に</Sub></>}
+                    </Step>
+                    <Step n={3}>
+                        {language === 'en' 
+                            ? <>Apply Keep and Discard Flags <Sub>via bottom-left buttons, or calculate buttons in each tab</Sub></>
+                            : <>確保フラグと廃棄フラグをつける <Sub>左下ボタン、または各タブの計算ボタンから</Sub></>}
+                    </Step>
+                    <Step n={4}>
+                        {language === 'en' 
+                            ? <>Register trash or favorites in GBF while comparing with the Game UI Tab <Sub><AlertTriangle size={14} style={{ display: 'inline', verticalAlign: 'text-bottom', marginRight: '0.1rem' }} />Be careful of misclicks</Sub></>
+                            : <>ゲーム内UIタブと見比べながら、グラブルで不用品やお気に入りの登録を行う <Sub><AlertTriangle size={14} style={{ display: 'inline', verticalAlign: 'text-bottom', marginRight: '0.1rem' }} />押し間違いに注意</Sub></>}
+                    </Step>
+                    <Step n={5}>
+                        {language === 'en' 
+                            ? <><Tag>Recommended</Tag>Re-acquire AF data and confirm no Keep-suggested AFs were trashed <Sub>A warning will appear during flag calculation</Sub></>
+                            : <><Tag>おすすめ</Tag>再度AFデータを取得し、確保提案AFを不用品にしていないか確認 <Sub>該当AFはフラグ計算時に警告が出ます</Sub></>}
+                    </Step>
                     <Step n={6}>{language === 'en' ? 'Dismantle trash AFs in GBF' : 'グラブルで不用品のAFを分解'}</Step>
                 </div>
             </Section>

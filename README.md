@@ -77,6 +77,51 @@
 
 ---
 
+## 🔨 ソースからビルドする
+
+自分でビルドしたい方向けの手順です。
+
+### 前提条件
+
+| ツール | 用途 |
+|---|---|
+| [Node.js](https://nodejs.org/) (v18+) | フロントエンド（React + Vite）のビルド |
+| [Rust](https://www.rust-lang.org/tools/install) (stable) | Tauriバックエンドのコンパイル |
+| [Tauri CLI](https://v2.tauri.app/start/prerequisites/) | デスクトップアプリのビルド・パッケージング |
+
+> [!NOTE]
+> Windows環境では、Rustのインストール時に [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) も必要になります。Tauri公式の[前提条件ガイド](https://v2.tauri.app/start/prerequisites/)を参照してください。
+
+### ビルド手順
+
+```bash
+# 1. リポジトリをクローン
+git clone https://github.com/kamuiz-south/GBF-AF-Manager.git
+cd GBF-AF-Manager
+
+# 2. フロントエンドの依存関係をインストール
+cd af-manager
+npm install
+
+# 3. デスクトップアプリをビルド（フロントエンド + Tauri）
+npx tauri build
+```
+
+ビルド成果物は `af-manager/src-tauri/target/release/` に出力されます。
+
+### リリースパッケージの作成
+
+プロジェクトルートの `build.bat` を実行すると、以下の一連の処理が自動で行われます。
+
+1. フロントエンドビルド + Tauriアプリのコンパイル
+2. インストーラー（MSI / NSIS）のZIPアーカイブ作成
+3. ポータブル版（単体.exe）のZIPアーカイブ作成
+4. AF Collector（ブラウザ拡張機能）のZIPアーカイブ作成
+
+出力先: `releases/` フォルダ
+
+---
+
 ## ⚖️ 免責事項・ライセンス
 
 - **自己責任**: 本ツールを利用したことで発生したいかなる不利益についても、開発者は一切の責任を負いません。

@@ -409,7 +409,7 @@ export default function SettingsTab() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', maxWidth: '800px', margin: '0 auto', paddingBottom: '3rem' }}>
             <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1.2rem' }}>
-                    <h2 style={{ fontSize: 'calc(var(--font-size-main) * 1.8)', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+                    <h2 style={{ fontSize: 'calc(var(--font-size-main) * 1.8)', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0, whiteSpace: 'nowrap' }}>
                         <SettingsIcon /> {language === 'en' ? 'Settings' : '設定'}
                     </h2>
                     {/* Navigation Icons */}
@@ -433,7 +433,7 @@ export default function SettingsTab() {
                                     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
                                 }}
                             >
-                                <item.icon size={18} />
+                                <item.icon size={18} style={{ pointerEvents: 'none' }} />
                             </button>
                         ))}
                     </nav>
@@ -683,6 +683,23 @@ export default function SettingsTab() {
                             const newExs = [...(settings.evaluationFormula.exceptions || [])];
                             newExs[idx] = updated;
                             updateSettings({ ...settings, evaluationFormula: { ...settings.evaluationFormula, exceptions: newExs } });
+                        };
+
+                        const toggleFolderOpen = (idx: number, isOpen: boolean) => {
+                            setSettings(prev => {
+                                const newExs = [...(prev.evaluationFormula?.exceptions || [])];
+                                if (newExs[idx]) newExs[idx] = { ...newExs[idx], isOpen } as any;
+                                return { ...prev, evaluationFormula: { ...(prev.evaluationFormula || {}), exceptions: newExs } };
+                            });
+                            db.settings.get('global').then(latest => {
+                                const base = latest ?? settings;
+                                const baseExs = base.evaluationFormula?.exceptions ? [...base.evaluationFormula.exceptions] : [];
+                                if (baseExs[idx]) baseExs[idx] = { ...baseExs[idx], isOpen } as any;
+                                db.settings.put({
+                                    ...base,
+                                    evaluationFormula: { ...(base.evaluationFormula || {}), exceptions: baseExs }
+                                }).catch(console.error);
+                            });
                         };
 
                         const handleItemMove = (srcIdx: number, srcParent: number | null, dstIdx: number, dstParent: number | null) => {
@@ -1048,7 +1065,7 @@ export default function SettingsTab() {
                                     }}>
                                         <div 
                                             style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.2rem 3px 0.2rem 2px', cursor: 'pointer' }}
-                                            onClick={() => updateEntry({ ...entry, isOpen: !entry.isOpen }, entryIdx)}
+                                            onClick={() => toggleFolderOpen(entryIdx, !entry.isOpen)}
                                         >
                                             <div style={{ display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}>
                                                 {entry.isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
@@ -1316,7 +1333,7 @@ export default function SettingsTab() {
                                             resize: 'vertical', 
                                             overflow: 'hidden', 
                                             minHeight: '100px', 
-                                            maxHeight: '400px',
+                                            maxHeight: '1200px',
                                             background: 'rgba(255,255,255,0.01)', 
                                             display: 'flex',
                                             flexDirection: 'column'
