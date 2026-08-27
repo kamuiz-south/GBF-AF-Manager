@@ -240,4 +240,8 @@ export interface Settings {
       locked: boolean;
     };
   };
+  autoFlagUpdate?: {
+    keepFlag: boolean;
+    discardFlag: boolean;
+  };
 }

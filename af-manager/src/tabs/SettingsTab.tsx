@@ -1,12 +1,13 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Download, Upload, Trash2, Plus, Minus, RefreshCw, Palette, Zap, Save, Settings as SettingsIcon, ShieldAlert, MonitorUp, HardDrive, ArrowRight, Calculator, Sun, Moon, GripVertical, Copy, ChevronRight, ChevronDown, FolderPlus, AlertTriangle, Folder, Edit2, RotateCcw, Bell } from 'lucide-react';
+import { Download, Upload, Trash2, Plus, Minus, RefreshCw, Palette, Zap, Save, Settings as SettingsIcon, ShieldAlert, MonitorUp, HardDrive, ArrowRight, Calculator, Sun, Moon, GripVertical, Copy, ChevronRight, ChevronDown, FolderPlus, AlertTriangle, Folder, Edit2, RotateCcw, Bell, CheckCircle2, Wand2 } from 'lucide-react';
 import { db } from '../db';
 import type { Settings } from '../types';
 import { DEFAULT_DESIGN } from '../types';
 import { exportDatabase, importDatabase, exportMemos, importMemos, exportConditions, importConditions } from '../utils/backup';
 import { G1_SKILLS, G2_SKILLS, G3_SKILLS } from '../data/skillMaster';
 import { evaluateArtifact } from '../utils/evaluator';
+import { MAX_AF_INVENTORY } from '../constants';
 import { runDiscardCalc } from '../utils/discardCalc';
 import { alertUnnecessaryKeeps } from '../utils/alertUnnecessaryKeeps';
 import { useAppStore } from '../store/useAppStore';
@@ -61,6 +62,12 @@ export default function SettingsTab() {
     const [localFonts, setLocalFonts] = useState<string[]>([]);
     const [localFontMain, setLocalFontMain] = useState('');
     const [localFontSub, setLocalFontSub] = useState('');
+    const [previewFontMain, setPreviewFontMain] = useState('');
+    const [previewFontSub, setPreviewFontSub] = useState('');
+    const [fontMainOpen, setFontMainOpen] = useState(false);
+    const [fontSubOpen, setFontSubOpen] = useState(false);
+    const fontMainRef = useRef<HTMLDivElement>(null);
+    const fontSubRef = useRef<HTMLDivElement>(null);
     const [confirmDeleteExIdx, setConfirmDeleteExIdx] = useState<number | null>(null);
     const setSettingsDirty = useAppStore(state => state.setSettingsDirty);
     const showToast = useAppStore(state => state.showToast);
@@ -78,6 +85,24 @@ export default function SettingsTab() {
         }));
         setHasDiscardChanges(true);
     }, []);
+
+    // click-outside detection for font dropdowns
+    useEffect(() => {
+        if (!fontMainOpen && !fontSubOpen) return;
+        const handler = (e: MouseEvent) => {
+            const target = e.target as Node;
+            if (fontMainOpen && fontMainRef.current && !fontMainRef.current.contains(target)) {
+                setFontMainOpen(false);
+                setPreviewFontMain('');
+            }
+            if (fontSubOpen && fontSubRef.current && !fontSubRef.current.contains(target)) {
+                setFontSubOpen(false);
+                setPreviewFontSub('');
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [fontMainOpen, fontSubOpen]);
 
     useEffect(() => {
         db.settings.get('global').then(res => {
@@ -393,6 +418,14 @@ export default function SettingsTab() {
             });
         }
     };
+    const updateAutoFlag = (patch: Partial<NonNullable<Settings['autoFlagUpdate']>>) => {
+        const newVal = { keepFlag: false, discardFlag: false, ...(settings.autoFlagUpdate ?? {}), ...patch };
+        setSettings(prev => ({ ...prev, autoFlagUpdate: newVal }));
+        db.settings.get('global').then(latest => {
+            const base = latest ?? settings;
+            db.settings.put({ ...base, autoFlagUpdate: newVal }).catch(console.error);
+        });
+    };
     const resetDesign = () => {
         const newSettings = { ...settings, design: { ...DEFAULT_DESIGN }, pageLimit: 10 };
         setSettings(newSettings);
@@ -417,6 +450,7 @@ export default function SettingsTab() {
                         {[
                             { id: 'evaluation-settings', icon: Calculator, label: language === 'en' ? 'Formula' : '計算式' },
                             { id: 'discard-settings', icon: ShieldAlert, label: language === 'en' ? 'Discard' : '廃棄設定' },
+                            { id: 'auto-flag-settings', icon: Wand2, label: language === 'en' ? 'Auto Flag' : '自動フラグ' },
                             { id: 'design-settings', icon: Palette, label: language === 'en' ? 'Design' : 'デザイン' },
                             { id: 'performance-settings', icon: Zap, label: language === 'en' ? 'Performance' : '軽量化' },
                             { id: 'notification-settings', icon: Bell, label: language === 'en' ? 'Notification' : '通知設定' },
@@ -1241,7 +1275,7 @@ export default function SettingsTab() {
                         className="input"
                         style={{ maxWidth: '200px' }}
                         value={settings.discardBehavior.targetInventoryCount}
-                        onChange={e => updateDiscardSettings({ targetInventoryCount: parseInt(e.target.value) || 1500 })}
+                        onChange={e => updateDiscardSettings({ targetInventoryCount: parseInt(e.target.value) || MAX_AF_INVENTORY })}
                     />
                 </div>
 
@@ -1442,6 +1476,54 @@ export default function SettingsTab() {
                 </button>
             </div>
 
+            {/* ── Auto Flag Update Settings ─────────────────────────── */}
+            <div id="auto-flag-settings" className="glass-panel" style={{ padding: '2rem', marginBottom: '1.5rem', scrollMarginTop: '2rem' }}>
+                <h3 style={{ fontSize: 'calc(var(--font-size-main) * 1.2)', marginBottom: '1.5rem', borderBottom: '1px solid var(--panel-border)', paddingBottom: '0.8rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Wand2 size={18} /> {language === 'en' ? 'Auto Flag Update Settings' : '自動フラグ更新設定'}
+                </h3>
+                
+                <div style={{ marginBottom: '1.5rem' }}>
+                    <div style={{ fontSize: 'var(--font-size-main)', marginBottom: '0.8rem', color: 'var(--text-main)', fontWeight: 600 }}>
+                        {language === 'en' ? 'Automatically update flags when Artifact data is updated.' : '所持AFを更新した時に自動でフラグを更新する'}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1.2rem', marginBottom: '0.8rem' }}>
+                        <span style={{ fontSize: 'var(--font-size-main)', fontWeight: 500, minWidth: '80px' }}>{language === 'en' ? 'Keep Flag' : '確保フラグ'}</span>
+                        <div style={{ display: 'flex', gap: '0.2rem', background: 'rgba(0,0,0,0.2)', padding: '0.2rem', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
+                            <button
+                                className={`btn ${settings.autoFlagUpdate?.keepFlag ? 'btn-primary' : 'btn-ghost'}`}
+                                style={{ padding: '0.3rem 1rem', minWidth: '70px', borderRadius: '6px', ...(settings.autoFlagUpdate?.keepFlag ? {} : { color: 'var(--text-muted)' }) }}
+                                onClick={() => updateAutoFlag({ keepFlag: true })}
+                            >ON</button>
+                            <button
+                                className={`btn ${!settings.autoFlagUpdate?.keepFlag ? 'btn-ghost' : 'btn-ghost'}`}
+                                style={{ padding: '0.3rem 1rem', minWidth: '70px', borderRadius: '6px', background: !settings.autoFlagUpdate?.keepFlag ? 'rgba(255,255,255,0.1)' : 'transparent', color: !settings.autoFlagUpdate?.keepFlag ? 'var(--text-main)' : 'var(--text-muted)' }}
+                                onClick={() => updateAutoFlag({ keepFlag: false })}
+                            >OFF</button>
+                        </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1.2rem' }}>
+                        <span style={{ fontSize: 'var(--font-size-main)', fontWeight: 500, minWidth: '80px' }}>{language === 'en' ? 'Trash Flag' : '廃棄フラグ'}</span>
+                        <div style={{ display: 'flex', gap: '0.2rem', background: 'rgba(0,0,0,0.2)', padding: '0.2rem', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
+                            <button
+                                className={`btn ${settings.autoFlagUpdate?.discardFlag ? 'btn-primary' : 'btn-ghost'}`}
+                                style={{ padding: '0.3rem 1rem', minWidth: '70px', borderRadius: '6px', ...(settings.autoFlagUpdate?.discardFlag ? {} : { color: 'var(--text-muted)' }) }}
+                                onClick={() => updateAutoFlag({ discardFlag: true })}
+                            >ON</button>
+                            <button
+                                className={`btn ${!settings.autoFlagUpdate?.discardFlag ? 'btn-ghost' : 'btn-ghost'}`}
+                                style={{ padding: '0.3rem 1rem', minWidth: '70px', borderRadius: '6px', background: !settings.autoFlagUpdate?.discardFlag ? 'rgba(255,255,255,0.1)' : 'transparent', color: !settings.autoFlagUpdate?.discardFlag ? 'var(--text-main)' : 'var(--text-muted)' }}
+                                onClick={() => updateAutoFlag({ discardFlag: false })}
+                            >OFF</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style={{ fontSize: 'calc(var(--font-size-sub) * 0.95)', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '1rem', borderTop: '1px solid var(--dim-border)', paddingTop: '1rem' }}>
+                    <CheckCircle2 size={14} style={{ color: 'var(--accent-green)' }} />
+                    {language === 'en' ? '* Settings apply immediately (No need to save).' : '※自動フラグ設定は即座に反映されます（「設定を保存」は不要です）'}
+                </div>
+            </div>
+
             {/* Moved Data Management below Advanced Settings */}
 
             {/* ── App Design Settings ─────────────────────────── */}
@@ -1502,38 +1584,126 @@ export default function SettingsTab() {
                     </div>
                 </div>
 
-                {/* Font Family Selection */}
-                <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
-                    <datalist id="font-options">
-                        {FONT_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                        {localFonts.map(f => <option key={f} value={f} />)}
-                    </datalist>
-
-                    <div style={{ flex: '1 1 200px' }}>
-                        <label style={{ display: 'block', fontSize: 'var(--font-size-main)', marginBottom: '0.4rem', fontWeight: 600 }}>
-                            {language === 'en' ? 'Main Text Font' : '本文フォント'}
-                        </label>
-                        <input type="text" list="font-options" className="input"
-                            style={{ width: '100%', padding: '0.4rem', fontSize: 'var(--font-size-main)' }}
-                            value={localFontMain}
-                            onChange={e => setLocalFontMain(e.target.value)}
-                            onBlur={() => updateDesign({ fontFamilyMain: localFontMain })}
-                            placeholder={language === 'en' ? 'Enter or select font name' : 'フォント名を入力または選択'}
-                        />
-                    </div>
-                    <div style={{ flex: '1 1 200px' }}>
-                        <label style={{ display: 'block', fontSize: 'var(--font-size-main)', marginBottom: '0.4rem', fontWeight: 600 }}>
-                            {language === 'en' ? 'Secondary Text Font' : '補助テキストフォント'}
-                        </label>
-                        <input type="text" list="font-options" className="input"
-                            style={{ width: '100%', padding: '0.4rem', fontSize: 'var(--font-size-main)' }}
-                            value={localFontSub}
-                            onChange={e => setLocalFontSub(e.target.value)}
-                            onBlur={() => updateDesign({ fontFamilySub: localFontSub })}
-                            placeholder={language === 'en' ? 'Enter or select font name' : 'フォント名を入力または選択'}
-                        />
-                    </div>
-                </div>
+                {/* Font Family Selection + Preview (side by side) */}
+                {(() => {
+                    const allFontOpts = [
+                        ...FONT_OPTIONS,
+                        ...localFonts.map(f => ({ label: f, value: f })),
+                    ];
+                    const previewMainFont = previewFontMain || localFontMain;
+                    const previewSubFont = previewFontSub || localFontSub;
+                    const customDropdown = ({
+                        label, value, isOpen, setIsOpen, onHover, onSelect, onLeave, ref
+                    }: {
+                        label: string; value: string; isOpen: boolean;
+                        setIsOpen: (v: boolean) => void;
+                        onHover: (v: string) => void;
+                        onSelect: (v: string) => void;
+                        onLeave: () => void;
+                        ref?: React.RefObject<HTMLDivElement>;
+                    }) => {
+                        const selectedLabel = allFontOpts.find(o => o.value === value)?.label ?? value;
+                        const dropdownBg = currentDesign.theme === 'dark' ? '#1e293b' : '#ffffff';
+                        const dropdownHover = currentDesign.theme === 'dark' ? '#334155' : '#f1f5f9';
+                        return (
+                            <div ref={ref}>
+                                <label style={{ display: 'block', fontSize: 'var(--font-size-main)', marginBottom: '0.4rem', fontWeight: 600 }}>
+                                    {label}
+                                </label>
+                                <div style={{ position: 'relative' }}>
+                                    <button
+                                        type="button"
+                                        className="input"
+                                        style={{ width: '100%', padding: '0.4rem 0.6rem', fontSize: 'var(--font-size-main)', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+                                        onClick={() => setIsOpen(!isOpen)}
+                                    >
+                                        <span style={{ fontFamily: value }}>{selectedLabel}</span>
+                                        <ChevronDown size={14} style={{ flexShrink: 0 }} />
+                                    </button>
+                                    {isOpen && (
+                                        <div
+                                            style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 300, maxHeight: '220px', overflowY: 'auto', background: dropdownBg, border: '1px solid var(--accent-blue)', borderRadius: '6px', boxShadow: '0 6px 20px rgba(0,0,0,0.5)' }}
+                                            onMouseLeave={onLeave}
+                                        >
+                                            {FONT_OPTIONS.length > 0 && (
+                                                <div>
+                                                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', padding: '5px 10px 2px', letterSpacing: '0.06em', background: dropdownBg }}>{language === 'en' ? 'BUILT-IN' : 'プリセット'}</div>
+                                                    {FONT_OPTIONS.map(opt => (
+                                                        <div
+                                                            key={opt.value}
+                                                            style={{ padding: '7px 12px', cursor: 'pointer', fontFamily: opt.value, background: value === opt.value ? 'var(--accent-blue)' : dropdownBg, color: value === opt.value ? '#fff' : 'var(--text-main)' }}
+                                                            onMouseEnter={e => { onHover(opt.value); (e.currentTarget as HTMLElement).style.background = value === opt.value ? 'var(--accent-blue)' : dropdownHover; }}
+                                                            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = value === opt.value ? 'var(--accent-blue)' : dropdownBg; }}
+                                                            onClick={() => { onSelect(opt.value); setIsOpen(false); onLeave(); }}
+                                                        >
+                                                            {opt.label}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            {localFonts.length > 0 && (
+                                                <div style={{ borderTop: '1px solid var(--dim-border)' }}>
+                                                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', padding: '5px 10px 2px', letterSpacing: '0.06em', background: dropdownBg }}>{language === 'en' ? 'SYSTEM' : 'システムフォント'}</div>
+                                                    {localFonts.map(f => (
+                                                        <div
+                                                            key={f}
+                                                            style={{ padding: '7px 12px', cursor: 'pointer', fontFamily: f, background: value === f ? 'var(--accent-blue)' : dropdownBg, color: value === f ? '#fff' : 'var(--text-main)' }}
+                                                            onMouseEnter={e => { onHover(f); (e.currentTarget as HTMLElement).style.background = value === f ? 'var(--accent-blue)' : dropdownHover; }}
+                                                            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = value === f ? 'var(--accent-blue)' : dropdownBg; }}
+                                                            onClick={() => { onSelect(f); setIsOpen(false); onLeave(); }}
+                                                        >
+                                                            {f}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    };
+                    return (
+                        <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '1.5rem', alignItems: 'flex-start' }}>
+                            {/* Left: dropdowns */}
+                            <div style={{ flex: '1 1 50%', minWidth: '220px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                {customDropdown({
+                                    label: language === 'en' ? 'Main Text Font' : '本文フォント',
+                                    value: localFontMain,
+                                    isOpen: fontMainOpen,
+                                    setIsOpen: (v) => { setFontMainOpen(v); if (v) setFontSubOpen(false); },
+                                    onHover: setPreviewFontMain,
+                                    onSelect: setLocalFontMain,
+                                    onLeave: () => setPreviewFontMain(''),
+                                    ref: fontMainRef,
+                                })}
+                                {customDropdown({
+                                    label: language === 'en' ? 'Secondary Text Font' : '補助テキストフォント',
+                                    value: localFontSub,
+                                    isOpen: fontSubOpen,
+                                    setIsOpen: (v) => { setFontSubOpen(v); if (v) setFontMainOpen(false); },
+                                    onHover: setPreviewFontSub,
+                                    onSelect: setLocalFontSub,
+                                    onLeave: () => setPreviewFontSub(''),
+                                    ref: fontSubRef,
+                                })}
+                                <button className="btn btn-primary" onClick={() => { updateDesign({ fontFamilyMain: localFontMain, fontFamilySub: localFontSub }); setFontMainOpen(false); setFontSubOpen(false); }} style={{ padding: '0.5rem 1rem', marginTop: '0.2rem' }}>
+                                    <CheckCircle2 size={16} style={{ marginRight: '0.4rem' }} /> {language === 'en' ? 'Apply Fonts' : 'フォントを適用'}
+                                </button>
+                            </div>
+                            {/* Right: preview */}
+                            <div style={{ flex: '1 1 50%', background: 'var(--dim-bg)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--panel-border)', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '180px' }}>
+                                <div style={{ fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)', marginBottom: '0.8rem' }}>{language === 'en' ? 'Preview' : 'プレビュー'}</div>
+                                <div style={{ fontFamily: previewMainFont, fontSize: 'calc(var(--font-size-main) * 1.1)', color: 'var(--text-main)', marginBottom: '0.5rem' }}>
+                                    {language === 'en' ? 'ABCDE12345' : 'ABC123あいうアイウ攻撃力'}
+                                </div>
+                                <div style={{ fontFamily: previewSubFont, fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)' }}>
+                                    {language === 'en' ? 'ABCDE12345' : 'ABC123あいうアイウ攻撃力'}
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })()}
 
                 {/* Manual Local Font Load Button */}
                 <div style={{ marginBottom: '1.5rem' }}>
