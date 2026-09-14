@@ -7,6 +7,7 @@ import { DEFAULT_DESIGN } from '../types';
 import { MAX_AF_INVENTORY } from '../constants';
 import { runCriteriaMatcher } from '../utils/matcher';
 import { alertUnnecessaryKeeps } from '../utils/alertUnnecessaryKeeps';
+import { saveKeepFlagSnapshot, generateUpgradeLog } from '../utils/upgradeLogger';
 import { useTranslation, type TranslationKey } from '../i18n';
 import { useAppStore } from '../store/useAppStore';
 import { translateSkill, reverseTranslateSkill } from '../utils/skillMapping';
@@ -312,10 +313,17 @@ export default function CriteriaTab() {
 
     const handleRunMatcher = async () => {
         try {
+            // スナップショット保存
+            await saveKeepFlagSnapshot('manual');
+            
             const allArtifacts = await db.artifacts.toArray();
             const updated = runCriteriaMatcher(allArtifacts, conditions);
             await db.artifacts.bulkPut(updated);
             showToast(language === 'en' ? 'Calculations complete, keep flags updated!' : '計算を実行し、確保フラグを更新しました！', 'success');
+            
+            // ログ生成
+            await generateUpgradeLog(updated.filter((a: any) => !!a.keepFlag), conditions);
+            
             await alertUnnecessaryKeeps(language);
         } catch (e) {
             console.error(e);

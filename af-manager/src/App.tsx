@@ -15,6 +15,7 @@ import { db } from './db';
 import { runCriteriaMatcher } from './utils/matcher';
 import { runDiscardCalc } from './utils/discardCalc';
 import { alertUnnecessaryKeeps } from './utils/alertUnnecessaryKeeps';
+import { saveKeepFlagSnapshot, generateUpgradeLog } from './utils/upgradeLogger';
 import { useAppStore } from './store/useAppStore';
 import { DEFAULT_DESIGN, type AppDesignSettings } from './types';
 import { useTranslation } from './i18n';
@@ -37,6 +38,9 @@ function TabZoomOverlay({ design, tabZoom, onAdjustZoom }: { design: AppDesignSe
 
 async function handleKeepCalc(language: string) {
   try {
+    // スナップショット保存
+    await saveKeepFlagSnapshot('manual');
+
     const [artifacts, conditions] = await Promise.all([
       db.artifacts.toArray(),
       db.conditions.toArray()
@@ -46,6 +50,10 @@ async function handleKeepCalc(language: string) {
     await db.artifacts.bulkPut(updated);
     const keptCount = updated.filter(a => a.keepFlag).length;
     useAppStore.getState().showToast(language === 'en' ? `Calculation complete.\nKept: ${keptCount} item(s)` : `確保フラグの一括計算が完了しました。\n確保対象: ${keptCount}件`, 'success');
+    
+    // ログ生成
+    await generateUpgradeLog(updated.filter(a => !!a.keepFlag), conditions);
+
     await alertUnnecessaryKeeps(language);
   } catch (e) {
     console.error(e);
@@ -285,7 +293,7 @@ function AppInner() {
           opacity: collapsed ? 0 : 0.7, height: '12px',
           transition: 'opacity 0.22s ease'
         }}>
-          v{import.meta.env.VITE_APP_VERSION || '1.0.9'}
+          v{import.meta.env.VITE_APP_VERSION || '1.1.0'}
         </div>
       </aside>
 

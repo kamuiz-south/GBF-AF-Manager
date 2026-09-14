@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { Download, Upload, Trash2, Plus, Minus, RefreshCw, Palette, Zap, Save, Settings as SettingsIcon, ShieldAlert, MonitorUp, HardDrive, ArrowRight, Calculator, Sun, Moon, GripVertical, Copy, ChevronRight, ChevronDown, FolderPlus, AlertTriangle, Folder, Edit2, RotateCcw, Bell, CheckCircle2, Wand2 } from 'lucide-react';
+
 import { db } from '../db';
 import type { Settings } from '../types';
 import { DEFAULT_DESIGN } from '../types';
@@ -1517,7 +1518,7 @@ export default function SettingsTab() {
                         </div>
                     </div>
                 </div>
-                
+
                 <div style={{ fontSize: 'calc(var(--font-size-sub) * 0.95)', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '1rem', borderTop: '1px solid var(--dim-border)', paddingTop: '1rem' }}>
                     <CheckCircle2 size={14} style={{ color: 'var(--accent-green)' }} />
                     {language === 'en' ? '* Settings apply immediately (No need to save).' : '※自動フラグ設定は即座に反映されます（「設定を保存」は不要です）'}
@@ -1600,7 +1601,7 @@ export default function SettingsTab() {
                         onHover: (v: string) => void;
                         onSelect: (v: string) => void;
                         onLeave: () => void;
-                        ref?: React.RefObject<HTMLDivElement>;
+                        ref?: React.RefObject<HTMLDivElement | null>;
                     }) => {
                         const selectedLabel = allFontOpts.find(o => o.value === value)?.label ?? value;
                         const dropdownBg = currentDesign.theme === 'dark' ? '#1e293b' : '#ffffff';

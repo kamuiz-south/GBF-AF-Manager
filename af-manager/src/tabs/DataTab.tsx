@@ -8,6 +8,7 @@ import { evaluateArtifact } from '../utils/evaluator';
 import { runCriteriaMatcher } from '../utils/matcher';
 import { runDiscardCalc } from '../utils/discardCalc';
 import { alertUnnecessaryKeeps } from '../utils/alertUnnecessaryKeeps';
+import { saveKeepFlagSnapshot, generateUpgradeLog } from '../utils/upgradeLogger';
 import type { Settings } from '../types';
 import { useTranslation } from '../i18n';
 import { useAppStore } from '../store/useAppStore';
@@ -17,6 +18,7 @@ const DEFAULT_SETTINGS: Settings = {
     evaluationFormula: { group1Multiplier: 1, group2Multiplier: 1, group3Multiplier: 1, skillMultipliers: {}, qualityValues: {}, exceptions: [] },
     discardBehavior: { treatUnnecessaryAsDiscard: true, targetInventoryCount: MAX_AF_INVENTORY, protectLocked: true, protectKeepFlag: true, protectRareAF: true, protectEquipped: true },
 };
+
 
 export default function DataTab() {
     const { t, language } = useTranslation();
@@ -111,6 +113,9 @@ export default function DataTab() {
         );
         if (!replace) throw new Error(language === 'en' ? 'Import canceled.' : '取り込みをキャンセルしました。');
 
+        // スナップショット保存（DB上書き前に現在の確保AFを退避）
+        await saveKeepFlagSnapshot('import');
+
         await db.artifacts.clear();
         await db.artifacts.bulkPut(newItems);
         await recordImportTimestamp();
@@ -119,7 +124,7 @@ export default function DataTab() {
         const autoDiscard = settings.autoFlagUpdate?.discardFlag ?? false;
 
         if (!autoKeep && !autoDiscard) {
-            // 自動更新なし
+            // 自動更新なし（スナップショットは手動計算時に使われるため残す）
             setStatus({
                 type: 'success',
                 message: language === 'en' ? `✅ Imported ${newItems.length} artifacts (${json.total_pages} pages). Please run the Keep condition calculations next.` : `✅ ${newItems.length}件のAFを取り込みました（${json.total_pages}ページ分）。確保フラグ計算を実行してください。`
@@ -138,6 +143,8 @@ export default function DataTab() {
             await db.artifacts.bulkPut(updated);
             const keptCount = updated.filter((a: any) => a.keepFlag).length;
             showToast(language === 'en' ? `Calculation complete.\nKept: ${keptCount} item(s)` : `確保フラグの一括計算が完了しました。\n確保対象: ${keptCount}件`, 'success');
+            // ログ生成
+            await generateUpgradeLog(updated.filter((a: any) => !!a.keepFlag), conditions);
         }
 
         // 3. 廃棄フラグ計算
@@ -169,6 +176,8 @@ export default function DataTab() {
             const newItems = parseArtifactData(jsonInput, existingCount);
             const settings = await getSettings();
             newItems.forEach(item => { item.evaluationScore = evaluateArtifact(item, settings); });
+            // スナップショット保存（上書き前に確保AFを退避）
+            await saveKeepFlagSnapshot('import');
             await db.artifacts.bulkPut(newItems);
             await recordImportTimestamp();
             setStatus({ type: 'success', message: language === 'en' ? `Imported ${newItems.length} artifacts! You can continue pasting the next page.` : `${newItems.length}件のアーティファクトを取り込みました！新しいページがあれば続けて入力してください。` });
