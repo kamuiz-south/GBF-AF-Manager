@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { AppArtifact, ArtifactMemo, Condition, ConditionGroup, Settings } from './types';
+import type { AppArtifact, ArtifactMemo, Condition, ConditionGroup, Settings, UpgradeLog, KeepFlagSnapshot } from './types';
 
 const db = new Dexie('AFManagerDatabase') as Dexie & {
     artifacts: EntityTable<AppArtifact, 'id'>;
@@ -7,6 +7,8 @@ const db = new Dexie('AFManagerDatabase') as Dexie & {
     conditions: EntityTable<Condition, 'id'>;
     settings: EntityTable<Settings, 'id'>;
     groups: EntityTable<ConditionGroup, 'id'>;
+    upgradeLogs: EntityTable<UpgradeLog, 'id'>;
+    keepFlagSnapshot: EntityTable<KeepFlagSnapshot, 'id'>;
 };
 
 // We only specify properties that need to be indexed.
@@ -22,6 +24,10 @@ db.version(3).stores({
 });
 db.version(4).stores({
     groups: 'id, order'
+});
+db.version(5).stores({
+    upgradeLogs: '++id, timestamp',
+    keepFlagSnapshot: 'id'
 });
 
 export { db };

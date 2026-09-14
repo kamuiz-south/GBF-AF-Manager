@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Search, ArrowUpDown, Heart, Package, Star, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Settings as SettingsIcon } from 'lucide-react';
 import { db } from '../db';
+import { MAX_AF_INVENTORY } from '../constants';
 import type { AppArtifact } from '../types';
 import { useTranslation, type TranslationKey } from '../i18n';
 import { useAppStore } from '../store/useAppStore';
@@ -303,7 +304,9 @@ export default function ListTab() {
                             <option value={300}>{language === 'en' ? '300 / page' : '300件 / ページ'}</option>
                             <option value={500}>{language === 'en' ? '500 / page' : '500件 / ページ'}</option>
                             <option value={750}>{language === 'en' ? '750 / page' : '750件 / ページ'}</option>
-                            <option value={1500}>{language === 'en' ? '1500 / page' : '1500件 / ページ'}</option>
+                            <option value={1000}>{language === 'en' ? '1000 / page' : '1000件 / ページ'}</option>
+                            <option value={1250}>{language === 'en' ? '1250 / page' : '1250件 / ページ'}</option>
+                            <option value={MAX_AF_INVENTORY}>{language === 'en' ? `${MAX_AF_INVENTORY} / page` : `${MAX_AF_INVENTORY}件 / ページ`}</option>
                         </select>
                     </div>
                 </div>
@@ -418,7 +421,9 @@ export default function ListTab() {
                             <option value={300}>300件 / ページ</option>
                             <option value={500}>500件 / ページ</option>
                             <option value={750}>750件 / ページ</option>
-                            <option value={1500}>1500件 / ページ</option>
+                            <option value={1000}>1000件 / ページ</option>
+                            <option value={1250}>1250件 / ページ</option>
+                            <option value={MAX_AF_INVENTORY}>{MAX_AF_INVENTORY}件 / ページ</option>
                         </select>
                     </div>
                 </div>

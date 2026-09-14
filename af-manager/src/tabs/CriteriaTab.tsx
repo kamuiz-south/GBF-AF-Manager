@@ -4,8 +4,10 @@ import { Plus, RefreshCw, ChevronUp, ChevronDown, ChevronRight, Trash2, Filter, 
 import { db } from '../db';
 import type { AppArtifact, Condition, ConditionGroup } from '../types';
 import { DEFAULT_DESIGN } from '../types';
+import { MAX_AF_INVENTORY } from '../constants';
 import { runCriteriaMatcher } from '../utils/matcher';
 import { alertUnnecessaryKeeps } from '../utils/alertUnnecessaryKeeps';
+import { saveKeepFlagSnapshot, generateUpgradeLog } from '../utils/upgradeLogger';
 import { useTranslation, type TranslationKey } from '../i18n';
 import { useAppStore } from '../store/useAppStore';
 import { translateSkill, reverseTranslateSkill } from '../utils/skillMapping';
@@ -185,7 +187,9 @@ export default function CriteriaTab() {
 
         if (editingId) {
             const existing = latestConds.find(c => c.id === editingId);
-            targetPriority = existing?.priority ?? latestConds.length;
+            const condMaxP = latestConds.length > 0 ? Math.max(...latestConds.map(c => c.priority)) : -1;
+            const groupMaxP = latestGroups.length > 0 ? Math.max(...latestGroups.map(g => g.sentinelPriority ?? -1)) : -1;
+            targetPriority = existing?.priority ?? (Math.max(condMaxP, groupMaxP) + 1);
             targetListId = existing?.listId || 'default';
         } else {
             // 新規作成：全要素の中の最大値 + 1
@@ -309,10 +313,17 @@ export default function CriteriaTab() {
 
     const handleRunMatcher = async () => {
         try {
+            // スナップショット保存
+            await saveKeepFlagSnapshot('manual');
+            
             const allArtifacts = await db.artifacts.toArray();
             const updated = runCriteriaMatcher(allArtifacts, conditions);
             await db.artifacts.bulkPut(updated);
             showToast(language === 'en' ? 'Calculations complete, keep flags updated!' : '計算を実行し、確保フラグを更新しました！', 'success');
+            
+            // ログ生成
+            await generateUpgradeLog(updated.filter((a: any) => !!a.keepFlag), conditions);
+            
             await alertUnnecessaryKeeps(language);
         } catch (e) {
             console.error(e);
@@ -524,7 +535,7 @@ export default function CriteriaTab() {
         const copyCond: Condition = {
             ...c,
             id: crypto.randomUUID(),
-            priority: conditions.length,
+            priority: c.priority + 0.5,
             name: `${c.name} ${language === 'en' ? '(Copy)' : ' - コピー'}`,
         };
         await db.conditions.put(copyCond);
@@ -808,12 +819,12 @@ export default function CriteriaTab() {
                                     <span style={{ fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)', fontWeight: 400 }}>
                                         {activeKeptCount}{language === 'en' ? ' / ' : '件 / '}{activeCap}{language === 'en' ? ' AFs' : '件'}
                                     </span>
-                                    {activeCap >= 1500 && (
+                                    {activeCap >= MAX_AF_INVENTORY && (
                                         <span
                                             title={language === 'en'
-                                                ? 'Active target count has reached the in-game inventory limit (1500)'
-                                                : '有効な確保対象の合計数がゲーム内の所持上限（1500）に達しています'}
-                                            style={{ display: 'inline-flex', alignItems: 'center', cursor: 'default' }}
+                                                ? `Active target count has reached the in-game inventory limit (${MAX_AF_INVENTORY})`
+                                                : `有効な確保対象の合計数がゲーム内の所持上限（${MAX_AF_INVENTORY}）に達しています`}
+                                            style={{ display: 'inline-flex', alignItems: 'center', cursor: 'help', padding: '0.4rem', margin: '-0.4rem' }}
                                         >
                                             <AlertTriangle size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
                                         </span>

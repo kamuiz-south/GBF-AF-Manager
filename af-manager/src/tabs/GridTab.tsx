@@ -633,7 +633,7 @@ function SkillRow({ skill, group, noWrap, theme }: { skill?: any; group: 1 | 2 |
                 <span style={{ color: groupColor, fontSize: 'var(--font-size-sub)', fontWeight: 600, minWidth: '30px', flexShrink: 0 }}>
                     {groupLabel}
                 </span>
-                <span style={{ fontSize: 'var(--font-size-main)', color: 'var(--text-main)', wordBreak: 'break-all', whiteSpace: noWrap ? 'nowrap' : 'normal', overflow: noWrap ? 'hidden' : 'visible', textOverflow: noWrap ? 'ellipsis' : 'clip', lineHeight: '1.4', minWidth: 0 }}>
+                <span style={{ fontSize: 'var(--font-size-main)', color: 'var(--text-main)', wordBreak: 'break-all', whiteSpace: noWrap ? 'nowrap' : 'normal', overflow: noWrap ? 'hidden' : 'visible', textOverflow: noWrap ? 'ellipsis' : 'clip', lineHeight: '1.4', minWidth: 0 }} title={skill.name}>
                     {skill.name}
                 </span>
             </div>

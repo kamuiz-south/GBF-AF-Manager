@@ -240,4 +240,34 @@ export interface Settings {
       locked: boolean;
     };
   };
+  autoFlagUpdate?: {
+    keepFlag: boolean;
+    discardFlag: boolean;
+  };
+  upgradeLogMaxCount?: number; // max upgrade logs to retain (default 20)
+}
+
+// ─── Upgrade Log Types ────────────────────────────────────────────
+export interface UpgradeLogEntry {
+  conditionId: string;
+  conditionName: string;
+  priority: number;
+  attribute: string;   // '1'〜'6'
+  weaponKind: string;  // '1'〜'10'
+  oldArtifacts: AppArtifact[];
+  newArtifacts: AppArtifact[];
+}
+
+export interface UpgradeLog {
+  id?: number;           // auto-increment
+  timestamp: string;     // ISO 8601
+  triggerType: 'import' | 'manual';
+  entries: UpgradeLogEntry[];
+}
+
+export interface KeepFlagSnapshot {
+  id: 'latest';
+  timestamp: string;
+  triggerType: 'import' | 'manual';
+  keptArtifacts: AppArtifact[];
 }

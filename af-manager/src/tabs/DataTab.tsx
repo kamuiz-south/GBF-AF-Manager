@@ -2,8 +2,13 @@ import { useState, useCallback, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Upload, Database, CheckCircle2, AlertTriangle, FileJson, Trash2 } from 'lucide-react';
 import { db } from '../db';
+import { MAX_AF_INVENTORY } from '../constants';
 import { parseArtifactData } from '../utils/parser';
 import { evaluateArtifact } from '../utils/evaluator';
+import { runCriteriaMatcher } from '../utils/matcher';
+import { runDiscardCalc } from '../utils/discardCalc';
+import { alertUnnecessaryKeeps } from '../utils/alertUnnecessaryKeeps';
+import { saveKeepFlagSnapshot, generateUpgradeLog } from '../utils/upgradeLogger';
 import type { Settings } from '../types';
 import { useTranslation } from '../i18n';
 import { useAppStore } from '../store/useAppStore';
@@ -11,8 +16,9 @@ import { useAppStore } from '../store/useAppStore';
 const DEFAULT_SETTINGS: Settings = {
     id: 'global',
     evaluationFormula: { group1Multiplier: 1, group2Multiplier: 1, group3Multiplier: 1, skillMultipliers: {}, qualityValues: {}, exceptions: [] },
-    discardBehavior: { treatUnnecessaryAsDiscard: true, targetInventoryCount: 1500, protectLocked: true, protectKeepFlag: true, protectRareAF: true, protectEquipped: true },
+    discardBehavior: { treatUnnecessaryAsDiscard: true, targetInventoryCount: MAX_AF_INVENTORY, protectLocked: true, protectKeepFlag: true, protectRareAF: true, protectEquipped: true },
 };
+
 
 export default function DataTab() {
     const { t, language } = useTranslation();
@@ -107,13 +113,57 @@ export default function DataTab() {
         );
         if (!replace) throw new Error(language === 'en' ? 'Import canceled.' : '取り込みをキャンセルしました。');
 
+        // スナップショット保存（DB上書き前に現在の確保AFを退避）
+        await saveKeepFlagSnapshot('import');
+
         await db.artifacts.clear();
         await db.artifacts.bulkPut(newItems);
         await recordImportTimestamp();
 
+        const autoKeep = settings.autoFlagUpdate?.keepFlag ?? false;
+        const autoDiscard = settings.autoFlagUpdate?.discardFlag ?? false;
+
+        if (!autoKeep && !autoDiscard) {
+            // 自動更新なし（スナップショットは手動計算時に使われるため残す）
+            setStatus({
+                type: 'success',
+                message: language === 'en' ? `✅ Imported ${newItems.length} artifacts (${json.total_pages} pages). Please run the Keep condition calculations next.` : `✅ ${newItems.length}件のAFを取り込みました（${json.total_pages}ページ分）。確保フラグ計算を実行してください。`
+            });
+            return;
+        }
+
+        // 1. 取り込み完了通知
+        showToast(language === 'en' ? 'AF data imported. Running Auto Flag Update...' : 'AFデータ取り込み完了。自動フラグ更新を実施します。', 'info');
+
+        // 2. 確保フラグ計算
+        if (autoKeep) {
+            const conditions = await db.conditions.toArray();
+            const allItems = await db.artifacts.toArray();
+            const updated = runCriteriaMatcher(allItems, conditions);
+            await db.artifacts.bulkPut(updated);
+            const keptCount = updated.filter((a: any) => a.keepFlag).length;
+            showToast(language === 'en' ? `Calculation complete.\nKept: ${keptCount} item(s)` : `確保フラグの一括計算が完了しました。\n確保対象: ${keptCount}件`, 'success');
+            // ログ生成
+            await generateUpgradeLog(updated.filter((a: any) => !!a.keepFlag), conditions);
+        }
+
+        // 3. 廃棄フラグ計算
+        if (autoDiscard) {
+            const discardMsg = await runDiscardCalc(settings, language);
+            showToast(discardMsg, 'info');
+        }
+
+        // 4. 完了通知
+        showToast(language === 'en' ? 'Auto Flag Update completed.' : '自動フラグ更新が完了しました。', 'success');
+
+        // 5. 確保フラグと廃棄フラグが競合する不用品チェック（確保フラグを計算した場合）
+        if (autoKeep) {
+            await alertUnnecessaryKeeps(language);
+        }
+
         setStatus({
             type: 'success',
-            message: language === 'en' ? `✅ Imported ${newItems.length} artifacts (${json.total_pages} pages). Please run the Keep condition calculations next.` : `✅ ${newItems.length}件のAFを取り込みました（${json.total_pages}ページ分）。確保フラグ計算を実行してください。`
+            message: language === 'en' ? `✅ Imported ${newItems.length} artifacts (${json.total_pages} pages). Auto Flag Update applied.` : `✅ ${newItems.length}件のAFを取り込みました（${json.total_pages}ページ分）。自動フラグ更新を実行しました。`
         });
     };
 
@@ -126,6 +176,8 @@ export default function DataTab() {
             const newItems = parseArtifactData(jsonInput, existingCount);
             const settings = await getSettings();
             newItems.forEach(item => { item.evaluationScore = evaluateArtifact(item, settings); });
+            // スナップショット保存（上書き前に確保AFを退避）
+            await saveKeepFlagSnapshot('import');
             await db.artifacts.bulkPut(newItems);
             await recordImportTimestamp();
             setStatus({ type: 'success', message: language === 'en' ? `Imported ${newItems.length} artifacts! You can continue pasting the next page.` : `${newItems.length}件のアーティファクトを取り込みました！新しいページがあれば続けて入力してください。` });

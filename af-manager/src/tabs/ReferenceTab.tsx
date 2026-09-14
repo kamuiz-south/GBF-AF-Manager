@@ -5,6 +5,7 @@ import { G1_SKILLS, G2_SKILLS, G3_SKILLS } from '../data/skillMaster';
 import { SKILL_EFFECT_DATA } from '../data/skillEffectData';
 import { translateSkill } from '../utils/skillMapping';
 import { useLiveQuery } from 'dexie-react-hooks';
+import UpgradeLogHistory from '../components/UpgradeLogHistory';
 import { db } from '../db';
 import { ATTRIBUTE_IDS, KIND_IDS, getKindNamesShort } from '../data/constants';
 import WeaponIcon from '../components/WeaponIcon';
@@ -44,6 +45,8 @@ export default function ReferenceTab() {
     const effectData = SKILL_EFFECT_DATA[selectedSkillId];
     const allArtifacts = useLiveQuery(() => db.artifacts.toArray()) || [];
     const globalSettings = useLiveQuery(() => db.settings.get('global'));
+
+
 
     const handleFilterChange = (key: FilterKey) => {
         setFilters(prev => {
@@ -295,6 +298,9 @@ export default function ReferenceTab() {
                     </button>
                 </div>
             </Section>
+
+            <UpgradeLogHistory />
+
         </div>
     );
 }
