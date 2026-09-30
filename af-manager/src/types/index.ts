@@ -256,6 +256,8 @@ export interface UpgradeLogEntry {
   weaponKind: string;  // '1'〜'10'
   oldArtifacts: AppArtifact[];
   newArtifacts: AppArtifact[];
+  methodType?: 1 | 2;        // 方法1 or 方法2
+  characterName?: string;    // 方法2の場合のキャラ名（グルーピングキーとして使用）
 }
 
 export interface UpgradeLog {

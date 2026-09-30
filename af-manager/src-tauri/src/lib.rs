@@ -30,6 +30,8 @@ async fn receive_artifacts(
     }
 }
 
+use axum::extract::DefaultBodyLimit;
+
 /// ポート 1422 で HTTP サーバー（axum）を起動する
 /// Tauri の setup フックから呼び出す
 pub fn start_http_server(handle: AppHandle) {
@@ -38,6 +40,8 @@ pub fn start_http_server(handle: AppHandle) {
     tauri::async_runtime::spawn(async move {
         let app = Router::new()
             .route("/api/artifacts", post(receive_artifacts))
+            // JSONペイロード上限をデフォルト(2MB)から50MBに変更
+            .layer(DefaultBodyLimit::max(50 * 1024 * 1024))
             .layer(CorsLayer::permissive())
             .with_state(state);
 

@@ -18,6 +18,7 @@ import { alertUnnecessaryKeeps } from './utils/alertUnnecessaryKeeps';
 import { saveKeepFlagSnapshot, generateUpgradeLog } from './utils/upgradeLogger';
 import { useAppStore } from './store/useAppStore';
 import { DEFAULT_DESIGN, type AppDesignSettings } from './types';
+import { useGlobalDataReceiver } from './hooks/useGlobalDataReceiver';
 import { useTranslation } from './i18n';
 
 // Per-tab zoom overlay component
@@ -88,6 +89,8 @@ function AppInner() {
   const collapsed = useAppStore(state => state.sidebarCollapsed);
   const setCollapsed = useAppStore(state => state.setSidebarCollapsed);
   const setGlobalSettings = useAppStore(state => state.setGlobalSettings);
+
+  useGlobalDataReceiver();
 
   // Sync settings to store
   useEffect(() => {
@@ -293,7 +296,7 @@ function AppInner() {
           opacity: collapsed ? 0 : 0.7, height: '12px',
           transition: 'opacity 0.22s ease'
         }}>
-          v{import.meta.env.VITE_APP_VERSION || '1.1.0'}
+          v{import.meta.env.VITE_APP_VERSION || '1.1.1'}
         </div>
       </aside>
 
@@ -311,7 +314,12 @@ function AppInner() {
         </div>
 
         <TabZoomOverlay design={currentDesign} tabZoom={currentTabZoom} onAdjustZoom={handleAdjustTabZoom} />
-        <div style={{ transform: `scale(${currentTabZoom})`, transformOrigin: 'top center', transition: 'transform 0.2s', minHeight: '100%' }}>
+        <div style={{ 
+          transform: currentTabZoom !== 1 ? `scale(${currentTabZoom})` : 'none', 
+          transformOrigin: 'top center', 
+          transition: currentTabZoom !== 1 ? 'transform 0.2s' : 'none', 
+          minHeight: '100%' 
+        }}>
           {(location.pathname === '/' || location.pathname === '/data') && <Navigate to="/data" replace />}
           {currentDesign.enableTabPersistence ? (
             <>

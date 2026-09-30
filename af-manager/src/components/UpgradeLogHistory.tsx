@@ -227,10 +227,20 @@ export default function UpgradeLogHistory() {
                                                     {isCondExpanded && (
                                                         <div style={{ padding: '0.8rem', display: 'flex', flexDirection: 'column', gap: '0.6rem', background: 'rgba(0,0,0,0.1)' }}>
                                                             {entriesForCond.map(entry => {
-                                                                const entryKey = `${log.id}__${condId}__${entry.attribute}__${entry.weaponKind}`;
+                                                                const isMethod2 = entry.methodType === 2 && entry.characterName !== undefined;
+                                                                const entryKey = isMethod2
+                                                                    ? `${log.id}__${condId}__char__${entry.characterName}`
+                                                                    : `${log.id}__${condId}__${entry.attribute}__${entry.weaponKind}`;
                                                                 const isEntryExpanded = expandedEntries[entryKey] !== false;
-                                                                const attrName = language === 'en' ? (ATTR_MAP_EN[entry.attribute] || entry.attribute) : (ATTR_MAP[entry.attribute] || entry.attribute);
-                                                                const kindName = language === 'en' ? (KIND_MAP_EN[entry.weaponKind] || entry.weaponKind) : (KIND_MAP[entry.weaponKind] || entry.weaponKind);
+
+                                                                // ヘッダーラベル
+                                                                const entryLabel = isMethod2
+                                                                    ? (entry.characterName || (language === 'en' ? 'Unknown Character' : '不明キャラ'))
+                                                                    : (() => {
+                                                                        const attrName = language === 'en' ? (ATTR_MAP_EN[entry.attribute] || entry.attribute) : (ATTR_MAP[entry.attribute] || entry.attribute);
+                                                                        const kindName = language === 'en' ? (KIND_MAP_EN[entry.weaponKind] || entry.weaponKind) : (KIND_MAP[entry.weaponKind] || entry.weaponKind);
+                                                                        return `${attrName} / ${kindName}`;
+                                                                    })();
                                                                 return (
                                                                     <div key={entryKey} style={{ border: '1px solid rgba(255,255,255,0.05)', borderRadius: '4px', overflow: 'hidden' }}>
                                                                         <div
@@ -239,7 +249,7 @@ export default function UpgradeLogHistory() {
                                                                         >
                                                                             {isEntryExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                                                                             <span style={{ fontSize: 'calc(var(--font-size-sub) * 0.95)', fontWeight: 600, color: 'var(--text-main)' }}>
-                                                                                {attrName} / {kindName}
+                                                                                {entryLabel}
                                                                             </span>
                                                                         </div>
                                                                         {isEntryExpanded && (

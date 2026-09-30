@@ -1,14 +1,23 @@
-﻿import { db } from '../db';
+import { db } from '../db';
 import type { AppArtifact, Condition, UpgradeLogEntry } from '../types';
 
 /**
  * 確保フラグ計算の直前に呼ぶ。
  * 現在DBにある keepFlag=true のAFをスナップショットとして退避する。
+ *
+ * triggerType が 'manual' の場合、既に 'import' 由来のスナップショットが
+ * 存在するときは上書きしない（インポート直後に手動計算しても比較元が正しく保たれる）。
  */
 export async function saveKeepFlagSnapshot(
     triggerType: 'import' | 'manual'
 ): Promise<void> {
     try {
+        // manual 呼び出し時: import 由来のスナップショットが残っていれば上書きしない
+        if (triggerType === 'manual') {
+            const existing = await db.keepFlagSnapshot.get('latest');
+            if (existing?.triggerType === 'import') return;
+        }
+
         const all = await db.artifacts.toArray();
         const kept = all.filter(a => !!a.keepFlag);
         await db.keepFlagSnapshot.put({
@@ -35,11 +44,20 @@ export async function generateUpgradeLog(
         const snapshot = await db.keepFlagSnapshot.get('latest');
         if (!snapshot) return;
 
-        // keepFlag の値が条件IDそのものなので、それを使う
-        const groupKey = (a: AppArtifact, condId: string) =>
-            `${condId}__${a.attribute}__${a.kind}`;
+        const condMap = new Map(conditions.map(c => [c.id, c]));
 
-        // 旧: スナップショット (conditionId x attribute x kind) -> AF[]
+        // グルーピングキー生成:
+        //   方法1 → condId__attribute__kind
+        //   方法2 → condId__characterName（武器種をまたいでキャラ単位でまとめる）
+        const groupKey = (a: AppArtifact, condId: string): string => {
+            const cond = condMap.get(condId);
+            if (cond?.methodType === 2) {
+                return `${condId}__char__${cond.characterName || '__unknown__'}`;
+            }
+            return `${condId}__${a.attribute}__${a.kind}`;
+        };
+
+        // 旧: スナップショット -> グループキー -> AF[]
         const oldMap = new Map<string, AppArtifact[]>();
         for (const a of snapshot.keptArtifacts) {
             const condId = a.keepFlag ?? '__unknown__';
@@ -48,7 +66,7 @@ export async function generateUpgradeLog(
             oldMap.get(key)!.push(a);
         }
 
-        // 新: 計算後 (conditionId x attribute x kind) -> AF[]
+        // 新: 計算後 -> グループキー -> AF[]
         const newMap = new Map<string, AppArtifact[]>();
         for (const a of newKeptArtifacts) {
             const condId = a.keepFlag ?? '__unknown__';
@@ -58,7 +76,6 @@ export async function generateUpgradeLog(
         }
 
         const allKeys = new Set([...oldMap.keys(), ...newMap.keys()]);
-        const condMap = new Map(conditions.map(c => [c.id, c]));
 
         const entries: UpgradeLogEntry[] = [];
         for (const key of allKeys) {
@@ -72,8 +89,24 @@ export async function generateUpgradeLog(
                 [...oldIds].every(id => newIds.has(id));
             if (same) continue;
 
-            const [condId, attribute, weaponKind] = key.split('__');
+            // キーを分解
+            const parts = key.split('__');
+            const condId = parts[0];
+            const isCharKey = parts[1] === 'char';
             const cond = condMap.get(condId);
+
+            // attribute/weaponKindは方法1のみ意味がある。方法2はリストから取得
+            let attribute = '';
+            let weaponKind = '';
+            if (!isCharKey) {
+                attribute = parts[1] ?? '';
+                weaponKind = parts[2] ?? '';
+            } else {
+                // 方法2: 実際のAFから代表的な属性を取得（表示用）
+                const sample = newList[0] || oldList[0];
+                attribute = sample?.attribute ?? '';
+                weaponKind = sample?.kind ?? '';
+            }
 
             entries.push({
                 conditionId: condId,
@@ -83,6 +116,8 @@ export async function generateUpgradeLog(
                 weaponKind,
                 oldArtifacts: oldList,
                 newArtifacts: newList,
+                methodType: cond?.methodType,
+                characterName: isCharKey ? (cond?.characterName || '') : undefined,
             });
         }
 
