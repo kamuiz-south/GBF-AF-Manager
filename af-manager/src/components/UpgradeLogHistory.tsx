@@ -57,26 +57,23 @@ export default function UpgradeLogHistory() {
         }
     };
 
-    const renderCompactAF = (af: AppArtifact, isOld: boolean, otherList: AppArtifact[]) => {
+    const renderCompactAF = (af: AppArtifact, isOld: boolean, otherList: AppArtifact[], isMethod2: boolean) => {
         const isDiff = !otherList.some(o => o.id === af.id);
-        const diffColor = isDiff
-            ? (isOld ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)')
-            : 'rgba(255, 255, 255, 0.02)';
-        const diffBorder = isDiff
-            ? (isOld ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid rgba(16, 185, 129, 0.4)')
-            : '1px solid var(--panel-border)';
+        const diffClass = isDiff ? (isOld ? 'diff-old' : 'diff-new') : 'diff-none';
 
         const skills = [af.skill1_info, af.skill2_info, af.skill3_info, af.skill4_info].filter(Boolean);
         const q5Outline = '0px 0px 3px var(--max-quality-outline), -1px -1px 0 var(--max-quality-outline), 1px -1px 0 var(--max-quality-outline), -1px 1px 0 var(--max-quality-outline), 1px 1px 0 var(--max-quality-outline)';
 
         return (
-            <div key={af.id} style={{
-                background: diffColor, border: diffBorder, borderRadius: '8px', padding: '0.8rem',
-                marginBottom: '0.6rem', boxShadow: isDiff ? '0 2px 8px rgba(0,0,0,0.2)' : 'none'
-            }}>
+            <div key={af.id} className={`upgrade-log-af-card ${diffClass}`}>
                 <div style={{ display: 'flex', justifySelf: 'stretch', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
                     <span style={{ fontWeight: 600, fontSize: 'var(--font-size-sub)', color: 'var(--text-main)' }}>
                         {af.name} <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 'calc(var(--font-size-sub) * 0.9)' }}>Lv{af.level}</span>
+                        {isMethod2 && (
+                            <span style={{ fontWeight: 400, marginLeft: '0.4rem' }}>
+                                ({language === 'en' ? KIND_MAP_EN[af.kind] || af.kind : KIND_MAP[af.kind] || af.kind})
+                            </span>
+                        )}
                     </span>
                     {af.evaluationScore !== undefined && (
                         <span style={{ fontSize: 'calc(var(--font-size-sub) * 0.9)', color: 'var(--accent-blue-hover)', fontWeight: 600 }}>
@@ -111,6 +108,7 @@ export default function UpgradeLogHistory() {
     };
 
     return (
+        <>
         <Section title={language === 'en' ? 'Keep AF Upgrade History' : '確保AF更新履歴'} icon={<History size={18} />}>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1.2rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
@@ -179,10 +177,10 @@ export default function UpgradeLogHistory() {
                         const sortedCondIds = Object.keys(condGroups).sort((a, b) => condGroups[a][0].priority - condGroups[b][0].priority);
 
                         return (
-                            <div key={log.id} style={{ border: '1px solid var(--panel-border)', borderRadius: '8px', overflow: 'hidden', background: 'rgba(0,0,0,0.1)' }}>
+                            <div key={log.id} className="upgrade-log-card">
                                 <div
+                                    className="upgrade-log-card-header"
                                     onClick={() => setExpandedLogs(prev => ({ ...prev, [log.id!]: !prev[log.id!] }))}
-                                    style={{ padding: '0.8rem 1.2rem', background: 'var(--dim-bg)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', userSelect: 'none' }}
                                 >
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
                                         {isLogExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
@@ -194,7 +192,7 @@ export default function UpgradeLogHistory() {
                                             color: log.triggerType === 'import' ? 'var(--accent-blue-hover)' : 'var(--accent-success)',
                                             border: `1px solid ${log.triggerType === 'import' ? 'rgba(59, 130, 246, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`
                                         }}>
-                                            {log.triggerType === 'import' ? (language === 'en' ? 'Import' : 'データ取り込み') : (language === 'en' ? 'Manual Calc' : '手動フラグ計算')}
+                                            {log.triggerType === 'import' ? (language === 'en' ? 'Import (AF Update)' : '所持AFデータ更新') : (language === 'en' ? 'Manual Calc (Cond Update)' : '確保条件更新')}
                                         </span>
                                     </div>
                                     <span style={{ fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)' }}>
@@ -202,7 +200,7 @@ export default function UpgradeLogHistory() {
                                     </span>
                                 </div>
                                 {isLogExpanded && (
-                                    <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.8rem', background: 'rgba(0,0,0,0.15)' }}>
+                                    <div className="upgrade-log-card-body">
                                         {sortedCondIds.map(condId => {
                                             const entriesForCond = condGroups[condId];
                                             const condName = entriesForCond[0].conditionName;
@@ -210,10 +208,10 @@ export default function UpgradeLogHistory() {
                                             const condKey = `${log.id}__${condId}`;
                                             const isCondExpanded = !!expandedConditions[condKey];
                                             return (
-                                                <div key={condId} style={{ border: '1px solid var(--dim-border)', borderRadius: '6px', overflow: 'hidden' }}>
+                                                <div key={condId} className="upgrade-log-cond-card">
                                                     <div
+                                                        className="upgrade-log-cond-header"
                                                         onClick={() => setExpandedConditions(prev => ({ ...prev, [condKey]: !prev[condKey] }))}
-                                                        style={{ padding: '0.6rem 1rem', background: 'rgba(255,255,255,0.02)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', userSelect: 'none' }}
                                                     >
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                                                             {isCondExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
@@ -225,7 +223,7 @@ export default function UpgradeLogHistory() {
                                                         </span>
                                                     </div>
                                                     {isCondExpanded && (
-                                                        <div style={{ padding: '0.8rem', display: 'flex', flexDirection: 'column', gap: '0.6rem', background: 'rgba(0,0,0,0.1)' }}>
+                                                        <div className="upgrade-log-cond-body">
                                                             {entriesForCond.map(entry => {
                                                                 const isMethod2 = entry.methodType === 2 && entry.characterName !== undefined;
                                                                 const entryKey = isMethod2
@@ -242,10 +240,10 @@ export default function UpgradeLogHistory() {
                                                                         return `${attrName} / ${kindName}`;
                                                                     })();
                                                                 return (
-                                                                    <div key={entryKey} style={{ border: '1px solid rgba(255,255,255,0.05)', borderRadius: '4px', overflow: 'hidden' }}>
+                                                                    <div key={entryKey} className="upgrade-log-entry-card">
                                                                         <div
+                                                                            className="upgrade-log-entry-header"
                                                                             onClick={() => setExpandedEntries(prev => ({ ...prev, [entryKey]: !prev[entryKey] }))}
-                                                                            style={{ padding: '0.5rem 0.8rem', background: 'rgba(255,255,255,0.03)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', userSelect: 'none' }}
                                                                         >
                                                                             {isEntryExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                                                                             <span style={{ fontSize: 'calc(var(--font-size-sub) * 0.95)', fontWeight: 600, color: 'var(--text-main)' }}>
@@ -253,15 +251,15 @@ export default function UpgradeLogHistory() {
                                                                             </span>
                                                                         </div>
                                                                         {isEntryExpanded && (
-                                                                            <div style={{ padding: '0.8rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', background: 'rgba(0,0,0,0.15)' }}>
+                                                                            <div className="upgrade-log-entry-body">
                                                                                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                                                                                     <div style={{ fontSize: 'calc(var(--font-size-sub) * 0.9)', fontWeight: 600, color: 'var(--accent-danger)', marginBottom: '0.5rem', borderBottom: '1px solid rgba(239, 68, 68, 0.2)', paddingBottom: '0.2rem' }}>
                                                                                         {language === 'en' ? 'Before (Replaced)' : '更新前 (変更・消失)'}
                                                                                     </div>
                                                                                     {entry.oldArtifacts.length === 0 ? (
-                                                                                        <div style={{ color: 'var(--text-muted)', fontSize: 'calc(var(--font-size-sub) * 0.9)', textAlign: 'center', padding: '1rem' }}>(None)</div>
+                                                                                        <div className="upgrade-log-empty-slot">(None)</div>
                                                                                     ) : (
-                                                                                        entry.oldArtifacts.map(af => renderCompactAF(af, true, entry.newArtifacts))
+                                                                                        entry.oldArtifacts.map(af => renderCompactAF(af, true, entry.newArtifacts, isMethod2))
                                                                                     )}
                                                                                 </div>
                                                                                 <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -269,9 +267,9 @@ export default function UpgradeLogHistory() {
                                                                                         {language === 'en' ? 'After (Current)' : '更新後 (確保)'}
                                                                                     </div>
                                                                                     {entry.newArtifacts.length === 0 ? (
-                                                                                        <div style={{ color: 'var(--text-muted)', fontSize: 'calc(var(--font-size-sub) * 0.9)', textAlign: 'center', padding: '1rem' }}>(None)</div>
+                                                                                        <div className="upgrade-log-empty-slot">(None)</div>
                                                                                     ) : (
-                                                                                        entry.newArtifacts.map(af => renderCompactAF(af, false, entry.oldArtifacts))
+                                                                                        entry.newArtifacts.map(af => renderCompactAF(af, false, entry.oldArtifacts, isMethod2))
                                                                                     )}
                                                                                 </div>
                                                                             </div>
@@ -292,5 +290,7 @@ export default function UpgradeLogHistory() {
                 </div>
             )}
         </Section>
+        <div style={{ height: '750px' }} />
+        </>
     );
 }

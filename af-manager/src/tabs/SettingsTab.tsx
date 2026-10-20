@@ -213,7 +213,7 @@ export default function SettingsTab() {
             const artifacts = await db.artifacts.toArray();
             artifacts.forEach(a => { a.evaluationScore = evaluateArtifact(a, settings); });
             await db.artifacts.bulkPut(artifacts);
-            showToast(language === 'en' ? 'Settings saved and artifact scores recalculated.' : '設定を保存し、評価値を再計算しました。', 'success');
+            showToast(language === 'en' ? 'Settings saved and artifact scores recalculated.\nRecalculation of keep flags is recommended.' : '設定を保存し、評価値を再計算しました。\n確保フラグの再計算を推奨します。', 'success');
         } catch (e) {
             console.error(e);
             showToast(language === 'en' ? 'Settings saved. (Failed to recalculate scores)' : '設定を保存しました。(評価値の再計算に失敗しました)', 'error');
@@ -1341,7 +1341,7 @@ export default function SettingsTab() {
                         </label>
 
                         {settings.discardBehavior.protectQuality5Skills && (
-                            <div style={{ marginLeft: '1.8rem', display: 'flex', flexDirection: 'column', gap: '0.8rem', background: 'var(--grid-item-bg)', padding: '0.8rem 1rem', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
+                            <div className="settings-group-box" style={{ marginLeft: '1.8rem', display: 'flex', flexDirection: 'column', gap: '0.8rem', padding: '0.8rem 1rem' }}>
                                 <div style={{ display: 'flex', gap: '1.5rem' }}>
                                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
                                         <input type="radio" 
@@ -1361,15 +1361,12 @@ export default function SettingsTab() {
 
                                 {settings.discardBehavior.protectQuality5Method === 'specific' && (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
-                                        <div style={{ 
-                                            border: '1px solid var(--panel-border)', 
-                                            borderRadius: '8px', 
+                                        <div className="settings-inner-list-box" style={{ 
                                             padding: '0.6rem', 
                                             resize: 'vertical', 
                                             overflow: 'hidden', 
                                             minHeight: '100px', 
                                             maxHeight: '1200px',
-                                            background: 'rgba(255,255,255,0.01)', 
                                             display: 'flex',
                                             flexDirection: 'column'
                                         }}>
@@ -1437,7 +1434,7 @@ export default function SettingsTab() {
                     </div>
                 </div>
 
-                <div style={{ marginBottom: '1.5rem', background: 'var(--grid-item-bg)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
+                <div className="settings-group-box" style={{ marginBottom: '1.5rem', padding: '1rem' }}>
                     <label style={{ display: 'block', fontSize: 'var(--font-size-main)', fontWeight: 600, marginBottom: '0.6rem' }}>
                         {language === 'en' ? 'Protect Specific Elements' : '特定の属性を保護'}
                     </label>
@@ -1455,7 +1452,7 @@ export default function SettingsTab() {
                         ].map(attr => {
                             const isChecked = settings.discardBehavior.protectedAttributes?.includes(attr.val) ?? false;
                             return (
-                                <label key={attr.val} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', background: 'var(--dim-bg)', padding: '0.3rem 0.6rem', borderRadius: '4px', border: `1px solid ${isChecked ? attr.color : 'transparent'}` }}>
+                                <label key={attr.val} className="settings-attr-chip" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', padding: '0.3rem 0.6rem', border: `1px solid ${isChecked ? attr.color : 'transparent'}` }}>
                                     <input type="checkbox"
                                         checked={isChecked}
                                         onChange={e => {
@@ -1489,30 +1486,30 @@ export default function SettingsTab() {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1.2rem', marginBottom: '0.8rem' }}>
                         <span style={{ fontSize: 'var(--font-size-main)', fontWeight: 500, minWidth: '80px' }}>{language === 'en' ? 'Keep Flag' : '確保フラグ'}</span>
-                        <div style={{ display: 'flex', gap: '0.2rem', background: 'rgba(0,0,0,0.2)', padding: '0.2rem', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
+                        <div className="settings-toggle-group">
                             <button
                                 className={`btn ${settings.autoFlagUpdate?.keepFlag ? 'btn-primary' : 'btn-ghost'}`}
                                 style={{ padding: '0.3rem 1rem', minWidth: '70px', borderRadius: '6px', ...(settings.autoFlagUpdate?.keepFlag ? {} : { color: 'var(--text-muted)' }) }}
                                 onClick={() => updateAutoFlag({ keepFlag: true })}
                             >ON</button>
                             <button
-                                className={`btn ${!settings.autoFlagUpdate?.keepFlag ? 'btn-ghost' : 'btn-ghost'}`}
-                                style={{ padding: '0.3rem 1rem', minWidth: '70px', borderRadius: '6px', background: !settings.autoFlagUpdate?.keepFlag ? 'rgba(255,255,255,0.1)' : 'transparent', color: !settings.autoFlagUpdate?.keepFlag ? 'var(--text-main)' : 'var(--text-muted)' }}
+                                className={`btn ${!settings.autoFlagUpdate?.keepFlag ? 'settings-toggle-btn-off-active' : 'btn-ghost'}`}
+                                style={{ padding: '0.3rem 1rem', minWidth: '70px', borderRadius: '6px', ...(!settings.autoFlagUpdate?.keepFlag ? {} : { color: 'var(--text-muted)' }) }}
                                 onClick={() => updateAutoFlag({ keepFlag: false })}
                             >OFF</button>
                         </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1.2rem' }}>
                         <span style={{ fontSize: 'var(--font-size-main)', fontWeight: 500, minWidth: '80px' }}>{language === 'en' ? 'Trash Flag' : '廃棄フラグ'}</span>
-                        <div style={{ display: 'flex', gap: '0.2rem', background: 'rgba(0,0,0,0.2)', padding: '0.2rem', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
+                        <div className="settings-toggle-group">
                             <button
                                 className={`btn ${settings.autoFlagUpdate?.discardFlag ? 'btn-primary' : 'btn-ghost'}`}
                                 style={{ padding: '0.3rem 1rem', minWidth: '70px', borderRadius: '6px', ...(settings.autoFlagUpdate?.discardFlag ? {} : { color: 'var(--text-muted)' }) }}
                                 onClick={() => updateAutoFlag({ discardFlag: true })}
                             >ON</button>
                             <button
-                                className={`btn ${!settings.autoFlagUpdate?.discardFlag ? 'btn-ghost' : 'btn-ghost'}`}
-                                style={{ padding: '0.3rem 1rem', minWidth: '70px', borderRadius: '6px', background: !settings.autoFlagUpdate?.discardFlag ? 'rgba(255,255,255,0.1)' : 'transparent', color: !settings.autoFlagUpdate?.discardFlag ? 'var(--text-main)' : 'var(--text-muted)' }}
+                                className={`btn ${!settings.autoFlagUpdate?.discardFlag ? 'settings-toggle-btn-off-active' : 'btn-ghost'}`}
+                                style={{ padding: '0.3rem 1rem', minWidth: '70px', borderRadius: '6px', ...(!settings.autoFlagUpdate?.discardFlag ? {} : { color: 'var(--text-muted)' }) }}
                                 onClick={() => updateAutoFlag({ discardFlag: false })}
                             >OFF</button>
                         </div>
@@ -1520,7 +1517,6 @@ export default function SettingsTab() {
                 </div>
 
                 <div style={{ fontSize: 'calc(var(--font-size-sub) * 0.95)', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '1rem', borderTop: '1px solid var(--dim-border)', paddingTop: '1rem' }}>
-                    <CheckCircle2 size={14} style={{ color: 'var(--accent-green)' }} />
                     {language === 'en' ? '* Settings apply immediately (No need to save).' : '※自動フラグ設定は即座に反映されます（「設定を保存」は不要です）'}
                 </div>
             </div>
@@ -1803,7 +1799,7 @@ export default function SettingsTab() {
                     )}
                 </div>
 
-                <div style={{ marginBottom: '1.5rem', background: 'rgba(0,0,0,0.15)', padding: '1.2rem', borderRadius: '12px', border: '1px solid var(--panel-border)' }}>
+                <div className="settings-section-box" style={{ marginBottom: '1.5rem', padding: '1.2rem' }}>
                     <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontSize: 'calc(var(--font-size-sub) * 1.05)', fontWeight: 500, color: 'var(--text-muted)' }}>{language === 'en' ? 'Status Label Colors' : 'グリッド内ステータス配色設定'}</span>
                         <button className="btn btn-ghost" 
@@ -1818,7 +1814,7 @@ export default function SettingsTab() {
                         </button>
                     </div>
                     
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                         {[
                             { key: 'fav', label: language === 'en' ? 'Fav' : 'お気に入り', text: 'Fav' },
                             { key: 'trash', label: language === 'en' ? 'Trash' : '不用品', text: 'Trash' },
@@ -1828,11 +1824,9 @@ export default function SettingsTab() {
                         ].map(({ key, label, text }) => {
                             const config = (currentDesign.statusColors as any)?.[key] || (DEFAULT_DESIGN.statusColors as any)[key];
                             return (
-                                <div key={key} style={{ 
+                                <div key={key} className="settings-status-row" style={{ 
                                     display: 'flex', alignItems: 'center', gap: '0.8rem', 
-                                    background: currentDesign.theme === 'light' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(15, 17, 26, 0.4)', 
-                                    padding: '0.2rem 0.6rem', borderRadius: '8px',
-                                    border: currentDesign.theme === 'light' ? '1px solid var(--panel-border)' : 'none'
+                                    padding: '0.2rem 0.6rem'
                                 }}>
                                     <div style={{ 
                                         width: '60px', textAlign: 'center', fontSize: '11px', fontWeight: 600, 
@@ -1851,9 +1845,9 @@ export default function SettingsTab() {
                                                    value={config.bg} 
                                                    onChange={e => updateDesign({ statusColors: { ...currentDesign.statusColors, [key]: { ...config, bg: e.target.value } } as any }, false)}
                                                    onBlur={() => updateDesign({}, true)}
-                                                   style={{ width: '42px', height: '28px', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer' }} />
+                                                   style={{ width: '42px', height: '28px', padding: 0, border: '1px solid var(--panel-border)', borderRadius: '4px', background: 'transparent', cursor: 'pointer' }} />
                                         </div>
-                                        <div style={{ display: 'flex', background: 'rgba(0,0,0,0.3)', borderRadius: '6px', padding: '2px' }}>
+                                        <div className="settings-wb-toggle">
                                             <button onClick={() => updateDesign({ statusColors: { ...currentDesign.statusColors, [key]: { ...config, text: 'white' } } as any })}
                                                     style={{ 
                                                         padding: '4px 12px', fontSize: '11px', border: 'none', borderRadius: '4px', cursor: 'pointer',
@@ -1978,6 +1972,12 @@ export default function SettingsTab() {
                             checked={currentDesign.dimCompletedCriteriaCells ?? true}
                             onChange={e => updateDesign({ dimCompletedCriteriaCells: e.target.checked })} />
                         <span><strong>{language === 'en' ? 'Change display of collected items' : '収集済み項目の表示を変更する'}</strong><br /><span style={{ fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)' }}>{language === 'en' ? 'In Method 1 detail view, mark items with completed target count with a checkmark and dim them.' : '方法1の詳細表示で、目標数の確保が完了している項目にチェックマークを付け暗く表示します。'}</span></span>
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.8rem', cursor: 'pointer', fontSize: 'var(--font-size-main)' }}>
+                        <input type="checkbox" style={{ marginTop: '3px' }}
+                            checked={currentDesign.hideCriteriaFolderSelect ?? false}
+                            onChange={e => updateDesign({ hideCriteriaFolderSelect: e.target.checked })} />
+                        <span><strong>{language === 'en' ? 'Hide folder setting field on Condition Cards' : '条件カードのフォルダ設定欄を非表示にする。'}</strong><br /><span style={{ fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)' }}>{language === 'en' ? 'When ON, the folder field is hidden and moving condition cards between folders can only be done by drag & drop.' : 'ONにすると、該当部分が非表示となり条件カードのフォルダ移動はD&Dのみとなります。'}</span></span>
                     </label>
                 </div>
 

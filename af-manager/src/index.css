@@ -65,16 +65,16 @@
   --max-quality-outline: #E3B7FF;
   --glass-blur: blur(16px);
   --focus-ring: 0 0 0 2px rgba(37, 99, 235, 0.4);
-  --dim-bg: rgba(0, 0, 0, 0.06);
-  --dim-border: rgba(0, 0, 0, 0.22);
+  --dim-bg: #f1f5f9;
+  --dim-border: #cbd5e1;
   --criteria-card-bg: #ffffff;
   --group-inner-bg: rgba(0, 0, 0, 0.03);
   --group-inner-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.02);
-  --criteria-detail-bg: rgba(0, 0, 0, 0.08);
-  --grid-item-bg: rgba(0, 0, 0, 0.08);
+  --criteria-detail-bg: #f1f5f9;
+  --grid-item-bg: #ffffff;
   --grid-item-rare-bg: rgba(244, 114, 182, 0.12);
   --grid-item-rare-border: rgba(244, 114, 182, 0.6);
-  --grid-item-selected-bg: #ffffff;
+  --grid-item-selected-bg: #eff6ff;
   --weapon-text-shadow: none;
   --criteria-new-bg: #ffffff;
   --skill-name-color: #000000;
@@ -573,3 +573,384 @@ select.input optgroup {
 .toast-content.success { border-bottom: 2px solid var(--accent-success); }
 .toast-content.error { border-bottom: 2px solid var(--accent-danger); }
 .toast-content.info { border-bottom: 2px solid var(--accent-blue); }
+
+/* ── UpgradeLogHistory (確保AF更新履歴) ── */
+.upgrade-log-card {
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.1);
+}
+.upgrade-log-card-header {
+  padding: 0.8rem 1.2rem;
+  background: var(--dim-bg);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  user-select: none;
+}
+.upgrade-log-card-body {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  background: rgba(0, 0, 0, 0.15);
+}
+.upgrade-log-cond-card {
+  border: 1px solid var(--dim-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.upgrade-log-cond-header {
+  padding: 0.6rem 1rem;
+  background: rgba(255, 255, 255, 0.02);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  user-select: none;
+}
+.upgrade-log-cond-body {
+  padding: 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  background: rgba(0, 0, 0, 0.1);
+}
+.upgrade-log-entry-card {
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.upgrade-log-entry-header {
+  padding: 0.5rem 0.8rem;
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  user-select: none;
+}
+.upgrade-log-entry-body {
+  padding: 0.8rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  background: rgba(0, 0, 0, 0.15);
+}
+.upgrade-log-af-card {
+  border-radius: 8px;
+  padding: 0.8rem;
+  margin-bottom: 0.6rem;
+}
+.upgrade-log-af-card.diff-none {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--panel-border);
+}
+.upgrade-log-af-card.diff-old {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+.upgrade-log-af-card.diff-new {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* ── Light Mode for UpgradeLogHistory ── */
+.theme-light .upgrade-log-card {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+.theme-light .upgrade-log-card-header {
+  background: #f1f5f9;
+  border-bottom: 1px solid #e2e8f0;
+}
+.theme-light .upgrade-log-card-body {
+  background: #f8fafc;
+}
+.theme-light .upgrade-log-cond-card {
+  border-color: #cbd5e1;
+  background: #ffffff;
+}
+.theme-light .upgrade-log-cond-header {
+  background: #f1f5f9;
+  border-bottom: 1px solid #e2e8f0;
+}
+.theme-light .upgrade-log-cond-body {
+  background: #f8fafc;
+}
+.theme-light .upgrade-log-entry-card {
+  border-color: #cbd5e1;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+.theme-light .upgrade-log-entry-header {
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+}
+.theme-light .upgrade-log-entry-body {
+  background: #ffffff;
+}
+.theme-light .upgrade-log-af-card.diff-none {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+.theme-light .upgrade-log-af-card.diff-old {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  box-shadow: 0 1px 3px rgba(239, 68, 68, 0.08);
+}
+.theme-light .upgrade-log-af-card.diff-new {
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  box-shadow: 0 1px 3px rgba(16, 185, 129, 0.08);
+}
+.upgrade-log-empty-slot {
+  color: var(--text-muted);
+  font-size: calc(var(--font-size-sub) * 0.9);
+  text-align: center;
+  padding: 1rem;
+}
+.theme-light .upgrade-log-empty-slot {
+  background: #f8fafc;
+  border-radius: 6px;
+  border: 1px dashed #cbd5e1;
+}
+
+/* ── CriteriaTab (欲しいAFの条件設定) ── */
+.criteria-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--criteria-card-bg);
+  padding: 0.8rem 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--panel-border);
+  transition: all 0.2s;
+}
+
+.criteria-group-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--dim-bg);
+  border-radius: 8px;
+  border: 1px solid var(--panel-border);
+  overflow: hidden;
+  transition: all 0.2s;
+}
+
+.criteria-group-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.8rem 0.4rem 1.0rem;
+  user-select: none;
+}
+
+.criteria-method-badge {
+  background: var(--dim-border);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: calc(var(--font-size-sub) * 0.95);
+}
+
+.criteria-skill-badge {
+  background: rgba(59, 130, 246, 0.2);
+  color: var(--accent-blue-hover);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.criteria-detail-tag {
+  background: var(--criteria-detail-bg);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: var(--font-size-sub);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: opacity 0.2s;
+}
+
+.criteria-empty-slot {
+  color: var(--text-muted);
+  font-size: var(--font-size-sub);
+  padding: 1rem;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 6px;
+}
+
+.criteria-preview-box {
+  background: var(--dim-bg);
+  border-radius: 8px;
+  padding: 0.8rem;
+  border: 1px solid var(--dim-border);
+}
+
+/* ── Light Mode for CriteriaTab ── */
+.theme-light .criteria-card {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.theme-light .criteria-group-card {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.theme-light .criteria-group-header {
+  background: #f1f5f9;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.theme-light .criteria-method-badge {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.theme-light .criteria-skill-badge {
+  background: rgba(37, 99, 235, 0.1);
+  color: #1d4ed8;
+}
+
+.theme-light .criteria-detail-tag {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  color: #1e293b;
+}
+
+.theme-light .criteria-empty-slot {
+  background: #ffffff;
+  border: 1px dashed #cbd5e1;
+  color: #64748b;
+}
+
+.theme-light .criteria-preview-box {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+.criteria-card-title {
+  color: var(--accent-gold);
+}
+
+.criteria-group-title {
+  font-weight: 700;
+  font-size: calc(var(--font-size-sub) + 1px);
+  color: var(--accent-gold);
+}
+
+.criteria-group-icon {
+  color: var(--accent-gold);
+}
+
+.theme-light .criteria-card-title {
+  color: var(--text-main);
+}
+
+.theme-light .criteria-group-title {
+  color: #0369a1;
+  font-weight: 600;
+}
+
+.theme-light .criteria-group-icon {
+  color: #0284c7;
+}
+
+/* ── SettingsTab (設定画面の統一ライトテーマ) ── */
+.settings-group-box {
+  background: var(--grid-item-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+}
+.theme-light .settings-group-box {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.settings-inner-list-box {
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.01);
+}
+.theme-light .settings-inner-list-box {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.settings-attr-chip {
+  background: var(--dim-bg);
+  border-radius: 4px;
+}
+.theme-light .settings-attr-chip {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.settings-toggle-group {
+  display: flex;
+  gap: 0.2rem;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 0.2rem;
+  border-radius: 8px;
+  border: 1px solid var(--panel-border);
+}
+.theme-light .settings-toggle-group {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.settings-toggle-btn-off-active {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-main);
+}
+.theme-light .settings-toggle-btn-off-active {
+  background: #ffffff;
+  color: var(--text-main);
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.settings-section-box {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+}
+.theme-light .settings-section-box {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.settings-status-row {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+}
+.theme-light .settings-status-row {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.settings-wb-toggle {
+  display: flex;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  padding: 2px;
+}
+.theme-light .settings-wb-toggle {
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+}
+.theme-light .settings-wb-toggle button {
+  color: #64748b;
+}

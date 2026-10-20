@@ -30,7 +30,7 @@ function broadcastProgress() {
     const progress = getProgress();
     chrome.runtime.sendMessage({ type: 'PROGRESS_UPDATE', progress }).catch(() => { });
     const label = state.total
-        ? `${state.received.size}/${state.total}`
+        ? `${Math.min(100, Math.floor((state.received.size / state.total) * 100))}%`
         : state.received.size > 0 ? `${state.received.size}` : '';
     chrome.action.setBadgeText({ text: label });
     chrome.action.setBadgeBackgroundColor({

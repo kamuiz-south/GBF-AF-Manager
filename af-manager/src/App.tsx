@@ -296,7 +296,7 @@ function AppInner() {
           opacity: collapsed ? 0 : 0.7, height: '12px',
           transition: 'opacity 0.22s ease'
         }}>
-          v{import.meta.env.VITE_APP_VERSION || '1.1.1'}
+          v{import.meta.env.VITE_APP_VERSION || '1.1.2'}
         </div>
       </aside>
 

@@ -133,6 +133,7 @@ export interface AppDesignSettings {
   detailSkillNoWrap?: boolean;      // Detail view long skill names clipping
   showCriteriaSkillBadge?: boolean; // Show target skill badge on condition cards (default true)
   showCriteriaMethodBadge?: boolean; // Show method type badge on condition cards (default true)
+  hideCriteriaFolderSelect?: boolean; // Hide folder select on condition cards (default false)
   hideFavoriteNoKeepIfEquipped?: boolean; // Don't highlight them if they are equipped
   useLegacyM1Grid?: boolean; // Restore old UI for Method 1 quantity settings
   swapCriteriaDetailGrid?: boolean; // Swap rows/cols in criteria detail table
@@ -163,6 +164,7 @@ export const DEFAULT_DESIGN: AppDesignSettings = {
   hideFavoriteNoKeepIfEquipped: true,
   showCriteriaSkillBadge: true,
   showCriteriaMethodBadge: true,
+  hideCriteriaFolderSelect: false,
   swapCriteriaDetailGrid: false,
   dimCompletedCriteriaCells: true,
   useLegacyM1Grid: false,

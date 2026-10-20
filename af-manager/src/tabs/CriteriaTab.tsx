@@ -100,6 +100,20 @@ export default function CriteriaTab() {
     const dbSettings = useLiveQuery(() => db.settings.get('global'));
     const currentDesign = { ...DEFAULT_DESIGN, ...(dbSettings?.design ?? {}) };
 
+    // === 選択中AFの最新化と非確保時のクリア ===
+    useEffect(() => {
+        if (selectedKeepAF) {
+            const currentInDb = allArtifacts.find(a => a.id === selectedKeepAF.id);
+            // 削除された、確保フラグが外れた、または別の条件に移動した場合は詳細を閉じる
+            if (!currentInDb || !currentInDb.keepFlag || currentInDb.keepFlag !== selectedKeepAF.keepFlag) {
+                setSelectedKeepAF(null);
+            } else if (JSON.stringify(currentInDb) !== JSON.stringify(selectedKeepAF)) {
+                // スコアや他のプロパティが更新された場合は最新のデータに差し替える
+                setSelectedKeepAF(currentInDb);
+            }
+        }
+    }, [allArtifacts, selectedKeepAF]);
+
     const toggleExpand = (id: string) => {
         setExpandedIds(prev => {
             const next = new Set(prev);
@@ -1394,7 +1408,7 @@ export default function CriteriaTab() {
                                             borderRadius: '2px'
                                         }} />
                                     )}
-                                    <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', background: 'var(--criteria-card-bg)', padding: '0.8rem 1rem', borderRadius: '8px', border: '2px solid var(--panel-border)', transition: 'all 0.2s', opacity: applyDimming ? 0.45 : 1, filter: applyDimming ? 'grayscale(0.4)' : 'none' } as any}>
+                                    <div className="criteria-card" style={{ opacity: applyDimming ? 0.45 : 1, filter: applyDimming ? 'grayscale(0.4)' : 'none' } as any}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: groups.length > 0 ? 'stretch' : 'flex-start' }}>
                                         <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
                                             <div style={{ cursor: 'pointer' }} onClick={() => toggleExpand(c.id)}>
@@ -1402,11 +1416,11 @@ export default function CriteriaTab() {
                                                     <span style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                                                         {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />} {displayNum}.
                                                     </span>
-                                                    <span style={{ color: 'var(--accent-gold)' }}>{c.name}</span>
+                                                    <span className="criteria-card-title">{c.name}</span>
                                                 </div>
                                                 <div style={{ fontSize: 'calc(var(--font-size-sub) * 0.95)', color: 'var(--text-main)', display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
                                                     {(currentDesign.showCriteriaMethodBadge ?? true) && (
-                                                    <span style={{ background: 'var(--dim-border)', padding: '2px 6px', borderRadius: '4px' }}>
+                                                    <span className="criteria-method-badge">
                                                         {c.methodType === 1 ? (language === 'en' ? 'Skill Oriented' : 'スキル指向') : (language === 'en' ? `Character Oriented: ${c.characterName}` : `キャラ指向：${c.characterName}`)}
                                                     </span>
                                                     )}
@@ -1426,7 +1440,7 @@ export default function CriteriaTab() {
                                                         }
                                                         const skName = c.skills[topKey];
                                                         return skName ? (
-                                                            <span style={{ background: 'rgba(59, 130, 246, 0.2)', color: 'var(--accent-blue-hover)', padding: '2px 6px', borderRadius: '4px' }}>
+                                                            <span className="criteria-skill-badge">
                                                                 {language === 'en' ? 'Target Skill:' : '対象スキル:'} <span style={{ color: 'var(--skill-name-color)' }}>{language === 'en' ? translateSkill(skName, language) : skName}</span> {c.skillMustMatch[topKey] ? (language === 'en' ? '(Must Match)' : '(必須)') : (language === 'en' ? '(Optional)' : '(任意)')}
                                                             </span>
                                                         ) : null;
@@ -1438,7 +1452,7 @@ export default function CriteriaTab() {
                                                     )}
                                                 </div>
                                             </div>
-                                            {groups.length > 0 && (
+                                            {groups.length > 0 && !(currentDesign.hideCriteriaFolderSelect ?? false) && (
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: 'auto', paddingTop: '0.4rem' }} onClick={e => e.stopPropagation()}>
                                                     <span style={{ fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{language === 'en' ? 'Folder:' : 'フォルダ:'}</span>
                                                     <select
@@ -1558,16 +1572,9 @@ export default function CriteriaTab() {
                                                         const isCompleted = currentCount >= count;
                                                         const isDimmed = dimCompleted && isCompleted;
                                                         return (
-                                                             <span key={key} style={{ 
-                                                                 background: 'var(--criteria-detail-bg)', 
-                                                                 padding: '2px 6px', 
-                                                                 borderRadius: '4px', 
-                                                                 fontSize: 'var(--font-size-sub)',
+                                                             <span key={key} className="criteria-detail-tag" style={{ 
                                                                  opacity: isDimmed ? 0.4 : 1,
-                                                                 transition: 'opacity 0.2s',
-                                                                 display: 'inline-flex',
-                                                                 alignItems: 'center',
-                                                                 gap: '4px'
+                                                                 transition: 'opacity 0.2s'
                                                              }}>
                                                                  {ATTRIBUTE_OPS.find(a => a.val === attr)?.label}{language === 'en' ? '' : '属性'}・{KIND_OPS.find(k => k.val === kind)?.label} ({count}{language === 'en' ? '' : '個'})
                                                                  {isDimmed && <Check size={14} strokeWidth={3} style={{ color: 'var(--accent-success)', opacity: 1 }} />}
@@ -1735,10 +1742,10 @@ export default function CriteriaTab() {
                                                         <div style={{ marginBottom: '0.8rem' }}>
                                                             <div style={{ fontSize: 'calc(var(--font-size-sub) * 0.95)', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.3rem', letterSpacing: '0.02em' }}>{language === 'en' ? 'Character Oriented Target:' : '【キャラ指定条件】'}</div>
                                                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.3rem' }}>
-                                                                <span style={{ background: 'var(--criteria-detail-bg)', padding: '2px 6px', borderRadius: '4px', fontSize: 'var(--font-size-sub)' }}>
+                                                                <span className="criteria-detail-tag">
                                                                     {language === 'en' ? 'Element:' : '属性:'} {ATTRIBUTE_OPS.find(a => a.val === c.attributes[0])?.label}
                                                                 </span>
-                                                                <span style={{ background: 'var(--criteria-detail-bg)', padding: '2px 6px', borderRadius: '4px', fontSize: 'var(--font-size-sub)' }}>
+                                                                <span className="criteria-detail-tag">
                                                                     {language === 'en' ? 'Weapon Kind:' : '武器種:'} {KIND_OPS.find(k => k.val === c.weaponKinds[0])?.label}{c.weaponKinds2?.[0] ? ` ${language === 'en' ? 'or' : 'または'} ${KIND_OPS.find(k => k.val === c.weaponKinds2?.[0])?.label}` : ''}
                                                                 </span>
                                                             </div>
@@ -1795,7 +1802,7 @@ export default function CriteriaTab() {
                                                         </span>
                                                     </div>
                                                     {selectedKeepAF && selectedKeepAF.keepFlag === c.id && (
-                                                        <div style={{ background: 'var(--dim-bg)', borderRadius: '8px', padding: '0.8rem', border: '1px solid var(--dim-border)' }}>
+                                                        <div className="criteria-preview-box">
                                                             <div style={{ fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-main)', fontSize: 'var(--font-size-sub)' }}>
                                                                 {selectedKeepAF.name} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>Lv{selectedKeepAF.level}</span>
                                                             </div>
@@ -1827,7 +1834,7 @@ export default function CriteriaTab() {
                                                         </div>
                                                     )}
                                                     {keptAFs.length === 0 ? (
-                                                        <div style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-sub)', padding: '1rem', textAlign: 'center', background: 'rgba(0,0,0,0.15)', borderRadius: '6px' }}>
+                                                        <div className="criteria-empty-slot">
                                                             {language === 'en' ? <><br />No AFs match this condition.<br />Please execute "Calculate Keep Flags".</> : <>確保対象のAFがありません。<br />「確保フラグ一括計算」を実行してください。</>}
                                                         </div>
                                                     ) : (
@@ -1998,14 +2005,15 @@ export default function CriteriaTab() {
                                         }} />
                                     )}
                                     {/* 実グループカード本体 */}
-                                    <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', background: 'var(--dim-bg)', borderRadius: '8px', border: '1px solid var(--panel-border)', boxShadow: dragOverId === group.id && dragOverPos === 'inside' ? '0 0 0 2px var(--accent-blue)' : 'none', overflow: 'hidden', opacity: isThisGroupAllDisabled ? 0.45 : 1, filter: isThisGroupAllDisabled ? 'grayscale(0.4)' : 'none', transition: 'all 0.2s' }}>
+                                    <div className="criteria-group-card" style={{ boxShadow: dragOverId === group.id && dragOverPos === 'inside' ? '0 0 0 2px var(--accent-blue)' : 'none', opacity: isThisGroupAllDisabled ? 0.45 : 1, filter: isThisGroupAllDisabled ? 'grayscale(0.4)' : 'none' }}>
 
                                         <div key={`hdr-${group.id}`}
+                                            className="criteria-group-header"
                                             onClick={() => !isEditing && toggleGroupCollapse(group.id)}
-                                            style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.8rem 0.4rem 1.0rem', cursor: isEditing ? 'default' : 'pointer', userSelect: 'none' }}
+                                            style={{ cursor: isEditing ? 'default' : 'pointer' }}
                                         >
                                             <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                                                {!isEditing && (isCollapsed ? <Folder size={15} color="var(--accent-gold)" /> : <FolderOpen size={15} color="var(--accent-gold)" />)}
+                                                {!isEditing && (isCollapsed ? <Folder size={15} className="criteria-group-icon" /> : <FolderOpen size={15} className="criteria-group-icon" />)}
                                                 {isEditing ? (
                                                     <input
                                                         className="input"
@@ -2020,7 +2028,7 @@ export default function CriteriaTab() {
                                                         autoFocus
                                                     />
                                                 ) : (
-                                                    <span style={{ fontWeight: 700, fontSize: 'calc(var(--font-size-sub) + 1px)', color: 'var(--accent-gold)' }}>
+                                                    <span className="criteria-group-title">
                                                         {group.name} <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: 'var(--font-size-sub)' }}>({groupCondCount})</span>
                                                     </span>
                                                 )}

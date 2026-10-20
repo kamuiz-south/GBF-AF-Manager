@@ -104,6 +104,18 @@ export default function GridTab() {
         }
     }, [pageItems, selectedArtifact, setSelectedArtifact]);
 
+    // === 選択中AFの最新化（DBでの更新を上部詳細ペインに反映） ===
+    useEffect(() => {
+        if (selectedArtifact) {
+            const currentInDb = artifacts.find(a => a.id === selectedArtifact.id);
+            if (!currentInDb) {
+                setSelectedArtifact(null);
+            } else if (JSON.stringify(currentInDb) !== JSON.stringify(selectedArtifact)) {
+                setSelectedArtifact(currentInDb);
+            }
+        }
+    }, [artifacts, selectedArtifact, setSelectedArtifact]);
+
     // Keyboard navigation for pages
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
