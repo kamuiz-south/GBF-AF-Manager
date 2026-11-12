@@ -2,6 +2,7 @@ import { db } from '../db';
 import type { Settings } from '../types';
 import { evaluateArtifact, isRareArtifact, getCleanName } from './evaluator';
 import { G1_SKILLS, G2_SKILLS, G3_SKILLS } from '../data/skillMaster';
+import { resolveDiscardBehavior } from '../data/defaultSettings';
 
 /**
  * Runs the full discard-flag calculation:
@@ -12,13 +13,14 @@ import { G1_SKILLS, G2_SKILLS, G3_SKILLS } from '../data/skillMaster';
  *   5. Saves to DB and alerts the user
  *
  * Call this from both the sidebar button (App.tsx) and the Settings tab button.
- * When adding new protection options, update ONLY this file.
+ * When adding new protection options, update DEFAULT_DISCARD_BEHAVIOR
+ * in data/defaultSettings.ts, the Settings UI, and this file.
  */
 export async function runDiscardCalc(settings: Settings, language: string = 'ja'): Promise<string> {
     const artifacts = await db.artifacts.toArray();
     const memos = await db.memos.toArray();
     const memoIds = new Set(memos.filter(m => m.memo && m.memo.trim() !== '').map(m => m.id));
-    const b = settings.discardBehavior;
+    const b = resolveDiscardBehavior(settings.discardBehavior);
 
     // Step 1: Re-evaluate scores, reset discard flags
     artifacts.forEach(a => {
@@ -79,14 +81,14 @@ export async function runDiscardCalc(settings: Settings, language: string = 'ja'
         }
 
         const isProtected =
-            ((b.protectLocked ?? true) && a.is_locked) ||
-            ((b.protectKeepFlag ?? true) && !!a.keepFlag) ||
-            ((b.protectRareAF ?? true) && isRareArtifact(a)) ||
-            ((b.protectEquipped ?? true) && isEquippedAF) ||
-            ((b.protectMemos ?? true) && memoIds.has(a.id)) ||
-            ((b.protectLv5Skills ?? true) && hasLv5Skill) ||
+            (b.protectLocked && a.is_locked) ||
+            (b.protectKeepFlag && !!a.keepFlag) ||
+            (b.protectRareAF && isRareArtifact(a)) ||
+            (b.protectEquipped && isEquippedAF) ||
+            (b.protectMemos && memoIds.has(a.id)) ||
+            (b.protectLv5Skills && hasLv5Skill) ||
             hasProtectedQuality5Skill ||
-            (b.protectedAttributes?.includes(a.attribute.toString()) ?? false);
+            b.protectedAttributes.includes(a.attribute.toString());
 
         if (isProtected) {
             protectedSet.push(a);

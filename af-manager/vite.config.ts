@@ -6,6 +6,11 @@ import packageJson from './package.json'
 export default defineConfig({
   base: './',
   plugins: [react()],
+  server: {
+    watch: {
+      ignored: ['**/src-tauri/**'],
+    },
+  },
   define: {
     'import.meta.env.VITE_APP_VERSION': JSON.stringify(packageJson.version)
   }

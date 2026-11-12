@@ -1,4 +1,4 @@
-import { BookOpen, Database, List, Grid, Filter, Settings as SettingsIcon, Heart, Trash2, Star, ChevronRight, Package, AlertTriangle } from 'lucide-react';
+import { BookOpen, Database, List, Grid, Filter, Settings as SettingsIcon, Heart, Trash2, Star, ChevronRight, Package, AlertTriangle, Library } from 'lucide-react';
 import { useTranslation } from '../i18n';
 
 const Section = ({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) => (
@@ -31,6 +31,13 @@ const Tag = ({ children }: { children: React.ReactNode }) => (
     <span style={{ padding: '0.1rem 0.4rem', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--dim-border)', borderRadius: '4px', fontSize: '0.85em', marginRight: '0.4rem', opacity: 0.9, fontWeight: 'normal' }}>
         {children}
     </span>
+);
+
+const SettingItem = ({ title, children }: { title: string; children: React.ReactNode }) => (
+    <div>
+        <strong style={{ color: 'var(--text-main)' }}>{title}</strong>
+        <p style={{ color: 'var(--text-muted)' }}>{children}</p>
+    </div>
 );
 
 export default function HelpTab() {
@@ -212,27 +219,65 @@ export default function HelpTab() {
             {/* ── 設定タブ ──────────── */}
             <Section title={language === 'en' ? 'Settings Tab' : '設定タブ'} icon={<SettingsIcon size={18} />}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem', fontSize: 'var(--font-size-main)', lineHeight: 1.7 }}>
-                    <div>
-                        <strong style={{ color: 'var(--text-main)' }}>{language === 'en' ? 'Evaluation Score Formula' : '評価スコア計算式'}</strong>
-                        <p style={{ color: 'var(--text-muted)' }}>{language === 'en' ? 'You can configure group coefficients for G1/G2/G3 skills, score values per quality level, individual skill multiplier coefficients, and adjustments for skill combinations. Clicking "Save Settings" recalculates the evaluation score of all AFs.' : 'G1/G2/G3スキルのグループ係数、品質係数、スキル基礎点、スキル組み合わせによる補正を設定できます。「設定を保存」で全AFの評価値が再計算されます。'}</p>
-                    </div>
-                    <div>
-                        <strong style={{ color: 'var(--text-main)' }}>{language === 'en' ? 'Discard Flag Settings' : '廃棄フラグ設定'}</strong>
-                        <p style={{ color: 'var(--text-muted)' }}>{language === 'en' ? 'Adjust criteria for discarding candidates (target inventory, various protection settings).' : '廃棄候補の基準（在庫目標数、各種保護設定）を調整します。'}</p>
-                    </div>
-                    <div>
-                        <strong style={{ color: 'var(--text-main)' }}>{language === 'en' ? 'Data Management / Export & Import' : 'AFデータ取得 / エクスポート・インポート'}</strong>
-                        <p style={{ color: 'var(--text-muted)' }}>{language === 'en' ? 'You can backup all data, or selectively export/import only conditions, memos, and evaluation formulas. Be sure to export before clearing your browser cache.' : '全データのバックアップ、条件・メモ・評価計算式のみの書き出し/読み込みができます。ブラウザキャッシュクリア前には必ずエクスポートしてください。'}</p>
-                    </div>
-                    <div>
-                        <strong style={{ color: 'var(--text-main)' }}>{language === 'en' ? 'App Design Settings' : 'アプリデザイン設定'}</strong>
-                        <p style={{ color: 'var(--text-muted)' }}>{language === 'en' ? 'You can alter zoom levels, select themes (Dark/Light), and adjust font sizes. Changes take effect immediately.' : 'ズーム率、テーマ（ダーク/ライト）、フォントサイズを変更できます。変更は即座に反映されます（保存ボタン不要）。'}</p>
-                    </div>
-                    <div>
-                        <strong style={{ color: 'var(--text-main)' }}>{language === 'en' ? 'Advanced Settings for Desktop App (Port Number)' : 'デスクトップアプリ版用上級者設定（ポート番号）'}</strong>
-                        <p style={{ color: 'var(--text-muted)' }}>{language === 'en' ? 'You can change the receiving port of AF Collector for the Desktop App version. Changes require a restart.' : 'デスクトップアプリ版使用時のAF Collector受信ポートを変更できます。変更後はアプリの再起動が必要です。'}</p>
-                    </div>
+                    <SettingItem title={language === 'en' ? 'Evaluation Formula' : '評価スコア計算式'}>
+                        {language === 'en'
+                            ? 'Configure group/quality multipliers, skill base points, combination modifiers, and fixed scores for quirky AFs. Saving recalculates all AF scores.'
+                            : 'グループ係数、★品質係数、スキル別基礎点、組み合わせ補正、クァーキーAFの固定評価値を設定します。保存時に全AFの評価値を再計算します。'}
+                    </SettingItem>
+                    <SettingItem title={language === 'en' ? 'Discard Settings' : 'AF廃棄設定'}>
+                        {language === 'en'
+                            ? 'Set the target inventory count and protection rules for packaged AFs, favorites, kept/equipped/memo AFs, Lv5/☆5 skills, and specific elements.'
+                            : '目標所持数と保護条件を設定します。不用品の扱い、お気に入り・確保AF・装備中・メモ付き・Lv5・☆5・特定属性などを保護できます。'}
+                    </SettingItem>
+                    <SettingItem title={language === 'en' ? 'Auto Flag Update' : '自動フラグ更新'}>
+                        {language === 'en'
+                            ? 'Automatically updates keep/discard flags when AF data is updated. Changes apply immediately.'
+                            : 'AFデータ更新時に確保・廃棄フラグを自動計算します。設定は即時反映されます。'}
+                    </SettingItem>
+                    <SettingItem title={language === 'en' ? 'App Design' : 'アプリデザイン設定'}>
+                        {language === 'en'
+                            ? 'Adjust global/tab zoom, theme, fonts, text sizes, weapon icons, grid details, condition card display, and status colors.'
+                            : '全体・タブ別ズーム、テーマ、フォント、文字サイズ、武器アイコン、グリッド詳細、条件カード表示、ステータス配色を変更できます。'}
+                    </SettingItem>
+                    <SettingItem title={language === 'en' ? 'Notifications' : '通知設定'}>
+                        {language === 'en'
+                            ? 'Set notification duration and the maximum number shown at once.'
+                            : '通知の表示時間と最大同時表示件数を変更します。'}
+                    </SettingItem>
+                    <SettingItem title={language === 'en' ? 'Performance' : '軽量化・パフォーマンス設定'}>
+                        {language === 'en'
+                            ? 'Choose whether to preserve tab state and scroll position. Turn OFF if the app feels heavy.'
+                            : 'タブの状態とスクロール位置を維持するかを設定します。動作が重い場合はOFFにします。'}
+                    </SettingItem>
+                    <SettingItem title={language === 'en' ? 'Desktop App Advanced Settings' : 'デスクトップアプリ版 上級者設定'}>
+                        {language === 'en'
+                            ? 'Save window size/position, set the AF Collector port, and enable automatic port fallback. Restart after changing the port.'
+                            : 'ウィンドウサイズ・位置の保存、AF Collectorの受信ポート、ポート自動フォールバックを設定します。ポート変更後は再起動が必要です。'}
+                    </SettingItem>
+                    <SettingItem title={language === 'en' ? 'Backup & Restore' : 'バックアップ・復元'}>
+                        {language === 'en'
+                            ? 'Export/import all data, criteria, memos, and the evaluation formula separately. Artifact data can be deleted separately.'
+                            : '全データ、確保条件、メモ、評価計算式を個別にエクスポート/インポートできます。所持AFデータは個別に削除できます。'}
+                    </SettingItem>
                 </div>
+                <Note>
+                    {language === 'en'
+                        ? 'Formula and discard settings apply when saved. Design, notifications, auto flags, and performance apply immediately.'
+                        : '評価計算式と廃棄設定は保存操作で反映されます。デザイン・通知・自動フラグ・軽量化は即時反映です。'}
+                </Note>
+            </Section>
+
+            {/* ── データタブ（参考データ） ──────────── */}
+            <Section title={language === 'en' ? 'Data Tab (Reference)' : 'データタブ（参考データ）'} icon={<Library size={18} />}>
+                <p style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-main)', marginBottom: '1rem', lineHeight: 1.6 }}>
+                    {language === 'en' ? 'Reference data for AF specifications and inventory counts.' : 'AFの仕様や所持数を確認できる参考データです。'}
+                </p>
+                <ul style={{ fontSize: 'var(--font-size-main)', color: 'var(--text-muted)', lineHeight: 1.8, paddingLeft: '1.4rem', margin: 0 }}>
+                    <li><strong style={{ color: 'var(--text-main)' }}>{language === 'en' ? 'Skill Effect Values:' : 'スキル効果量表:'}</strong> {language === 'en' ? 'Select a skill to view its effect values by ☆ and Lv.' : 'スキルを選択し、☆とLvごとの効果量を確認できます。'}</li>
+                    <li><strong style={{ color: 'var(--text-main)' }}>{language === 'en' ? 'Owned Artifact Counts:' : '所持アーティファクト個数:'}</strong> {language === 'en' ? 'Counts owned AFs by element × weapon kind, with status filters and axis swapping.' : '属性×武器種の所持数を集計します。状態フィルターと軸の入れ替えに対応しています。'}</li>
+                    <li><strong style={{ color: 'var(--text-main)' }}>{language === 'en' ? 'Keep AF Upgrade History:' : '確保AF更新履歴:'}</strong> {language === 'en' ? 'Review kept-AF changes before/after AF or criteria updates. Adjust the log limit and whether common AFs are shown.' : 'AF更新・条件更新時の確保AFの前後差分を確認できます。最大保持件数と共通AFの表示を切り替えられます。'}</li>
+                </ul>
+                <Note>{language === 'en' ? 'Each section can be collapsed from the right edge; the state is saved.' : '各セクションは右端のボタンで折りたためます。状態は保存されます。'}</Note>
             </Section>
 
             {/* ── よくある質問 ──────────── */}

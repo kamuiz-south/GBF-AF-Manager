@@ -22,6 +22,17 @@ const filesToUpdate = [
     update: (json) => { json.version = newVersion; }
   },
   {
+    path: path.join(managerDir, 'package-lock.json'),
+    type: 'json',
+    update: (json) => {
+      json.version = newVersion;
+      // lockfileVersion 2/3 は packages[""] にもルートバージョンを持つ
+      if (json.packages?.['']) {
+        json.packages[''].version = newVersion;
+      }
+    }
+  },
+  {
     path: path.join(managerDir, 'src-tauri', 'tauri.conf.json'),
     type: 'json',
     update: (json) => { json.version = newVersion; }
@@ -31,6 +42,11 @@ const filesToUpdate = [
     type: 'regex',
     regex: /^version\s*=\s*"[^"]+"/m,
     replace: `version = "${newVersion}"`
+  },
+  {
+    path: path.join(managerDir, 'src-tauri', 'Cargo.lock'),
+    type: 'cargo-lock',
+    packageName: 'app'
   },
   {
     path: path.join(managerDir, 'src', 'App.tsx'),
@@ -63,6 +79,20 @@ for (const file of filesToUpdate) {
       newContent = JSON.stringify(json, null, 2) + '\n';
     } else if (file.type === 'regex') {
       newContent = content.replace(file.regex, file.replace);
+    } else if (file.type === 'cargo-lock') {
+      // Cargo.lock は自動生成ファイルなので、対象パッケージの
+      // バージョン行だけをピンポイントで更新する。
+      const escapedName = file.packageName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const packagePattern = new RegExp(
+        `(\\[\\[package\\]\\]\\r?\\nname = "${escapedName}"\\r?\\nversion = ")[^"]+(")`
+      );
+      if (!packagePattern.test(content)) {
+        throw new Error(`Package "${file.packageName}" not found in Cargo.lock`);
+      }
+      newContent = content.replace(
+        packagePattern,
+        (_match, prefix, suffix) => `${prefix}${newVersion}${suffix}`
+      );
     }
 
     if (content !== newContent) {

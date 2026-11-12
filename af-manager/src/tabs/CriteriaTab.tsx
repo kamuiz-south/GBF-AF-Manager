@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Plus, RefreshCw, ChevronUp, ChevronDown, ChevronRight, Trash2, Filter, Copy, Folder, FolderOpen, FileText, Check, AlertTriangle, GripVertical } from 'lucide-react';
 import { db } from '../db';
@@ -12,7 +12,9 @@ import { useTranslation, type TranslationKey } from '../i18n';
 import { useAppStore } from '../store/useAppStore';
 import { translateSkill, reverseTranslateSkill } from '../utils/skillMapping';
 import { getKindNamesShort, getAttributeOps, getKindOps, ATTRIBUTE_IDS, KIND_IDS } from '../data/constants';
+import { G1_SKILLS, G2_SKILLS, G3_SKILLS } from '../data/skillMaster';
 import WeaponIcon from '../components/WeaponIcon';
+import SkillSuggestInput from '../components/SkillSuggestInput';
 
 // Move M1TableInput OUTSIDE to prevent re-mounting on every render
 const M1TableInput = ({ value, onChange }: { value: number; onChange: (v: string) => void }) => {
@@ -35,6 +37,11 @@ const M1TableInput = ({ value, onChange }: { value: number; onChange: (v: string
         />
     );
 };
+
+// Suggestion lists derived from the canonical skill master. Keep the master order and names.
+const SKILL_OPTS_G1 = G1_SKILLS.map(s => s.name);
+const SKILL_OPTS_G2 = G2_SKILLS.map(s => s.name);
+const SKILL_OPTS_G3 = G3_SKILLS.map(s => s.name);
 
 export default function CriteriaTab() {
     const { t, language } = useTranslation();
@@ -291,39 +298,17 @@ export default function CriteriaTab() {
     const ATTRIBUTE_OPS = getAttributeOps(t);
     const KIND_OPS = getKindOps(t);
 
-    const SKILL_OPTS_G1 = ["攻撃力", "HP", "クリティカル確率", "奥義ダメージ", "アビリティダメージ", "弱体成功率", "ダブルアタック確率", "トリプルアタック確率", "防御力", "弱体耐性", "回避率", "回復性能", "自属性攻撃力", "有利属性軽減"];
-    const SKILL_OPTS_G2 = ["通常攻撃ダメージ上限", "アビリティダメージ上限", "奥義ダメージ上限", "通常攻撃の与ダメージ上昇", "アビリティ与ダメージ上昇", "奥義与ダメージ上昇", "奥義ダメージ特殊上限UP", "チェイン与ダメージUP", "ターンダメージを軽減", "再生", "HPが100%の時、与ダメージUP", "HPが50%以上の時、トリプルアタック確率UP", "HPが50%以下の時、被ダメージを軽減", "クリティカル発動時、ダメージ上限UP", "最大HP上昇/防御力-70%", "通常攻撃ダメージ上限UP/アビリティダメージ上限-80％/奥義ダメージ上限-60％", "アビリティダメージ上限UP/通常攻撃ダメージ上限-20％/奥義ダメージ上限-60％", "奥義ダメージ上限UP/通常攻撃ダメージ上限-20％/アビリティダメージ上限-80％", "確率で強化効果が無効化されない", "確率で攻撃開始時に自分の弱体効果を1つ回復"];
-    const SKILL_OPTS_G3 = [
-        "弱体アビリティ使用時、敵に被ダメージUP(2回)",
-        "回復アビリティ使用時、自分の次に配置されたキャラに自属性追撃効果(1回)",
-        "リンクアビリティを一定回数使用時に自分のリンクアビリティの再使用間隔を1ターン短縮",
-        "使用間隔が10ターン以上のアビリティ使用時、自分に与ダメージUP",
-        "アビリティを一定回数使用する度に自分にダメージ上限UP(累積)",
-        "アビリティダメージを一定量与える毎に自分にアビリティ与ダメージ上昇(累積)",
-        "1回攻撃発動時、自分に一定個数ランダムな強化効果",
-        "ターン終了時、自分がそのターン中に消費したHPに応じて敵に無属性ダメージ",
-        "ターン終了時、自分がそのターン中に消費した奥義ゲージ量に応じて自分に与ダメージ上昇",
-        "攻撃開始時に敵の弱体効果の数が3つ以下の時、自分にブロック効果",
-        "ターン終了時にHPが50%以下の敵がいる時、一度だけ自分のHPを回復",
-        "サブメンバー時、一定ターン毎に敵全体にランダムな弱体効果を1つ付与(重複不可)",
-        "一定回数敵の攻撃行動のターゲットになった場合、一度だけ自分に自属性追撃(1回)効果",
-        "攻撃行動を行わなかった場合、ターン終了時に自分に一定個数ランダムな強化効果",
-        "キュアポーションまたはオールポーション使用時にフェイタルチェインゲージUP(重複不可)",
-        "敵に一定回数攻撃を与えた時、一度だけ自分に乱撃(3ヒット)効果(1回)",
-        "戦闘不能になった時、一度だけ味方全体に一定個数ランダムな強化効果",
-        "バトル登場時に一度だけ自分の与ダメージUP",
-        "バトル開始時に自分に一定個数ランダムな強化効果",
-        "バトル開始時から1ターンの間被ダメージ減少",
-        "バトル開始時と5ターン毎に自分にバリア効果",
-        "バトル開始時に最大HPの20%を消費するが3ターン後、自分にダメージ上限UP",
-        "1番目のアビリティ使用時にHPを一定割合消費するが、1番目のアビリティの使用間隔を1ターン短縮(レベルに応じて消費割合DOWN)",
-        "攻撃開始時、確率で自分に乱撃(6ヒット)効果(1回)",
-        "確率でターンの進行時に経過ターンを5ターン進める(重複不可)",
-        "ターン終了時、確率で敵の強化効果を全て無効化(重複不可)",
-        "バトル終了時にランダムな耳飾りを入手することがある(レベルに応じて入手確率UP/重複不可)",
-        "アイテムドロップ率UP(重複不可)",
-        "獲得経験値UP(重複不可)",
-    ];
+    // Skill suggestion lists for the condition form (translated once per language change).
+    const skillOptionSets = useMemo(() => {
+        if (language === 'en') {
+            return {
+                g1: SKILL_OPTS_G1.map(s => translateSkill(s, language)),
+                g2: SKILL_OPTS_G2.map(s => translateSkill(s, language)),
+                g3: SKILL_OPTS_G3.map(s => translateSkill(s, language)),
+            };
+        }
+        return { g1: SKILL_OPTS_G1, g2: SKILL_OPTS_G2, g3: SKILL_OPTS_G3 };
+    }, [language]);
 
     const handleRunMatcher = async () => {
         try {
@@ -852,7 +837,7 @@ export default function CriteriaTab() {
                             );
                         })()}
                     </h3>
-                    <button className="btn btn-ghost" onClick={() => setIsAdding(!isAdding)} style={{ border: '1px solid var(--panel-border)' }}>
+                    <button className="btn btn-ghost" onClick={() => setIsAdding(!isAdding)} style={{ border: '1px solid var(--panel-border)', whiteSpace: 'nowrap', flexShrink: 0 }}>
                         <Plus size={16} /> {language === 'en' ? 'Add Condition' : '条件を追加'}
                     </button>
                 </div>
@@ -958,7 +943,7 @@ export default function CriteriaTab() {
                                                     {KIND_OPS.map(k => (
                                                         <th key={k.val} style={{ padding: '0.3rem 0', fontSize: '12.5px', color: 'var(--text-main)', borderBottom: '2px solid var(--panel-border)', fontWeight: 400 }}>
                                                             {currentDesign.useWeaponIconsInTables ? (
-                                                                <WeaponIcon kind={k.val} size="1.5em" style={{ verticalAlign: 'middle' }} />
+                                                                <WeaponIcon kind={k.val} size="1.5em" style={{ verticalAlign: 'middle' }} label={namesShort[k.val] || k.label} />
                                                             ) : (
                                                                 namesShort[k.val] || k.label
                                                             )}
@@ -1026,30 +1011,26 @@ export default function CriteriaTab() {
                         <div style={{ marginBottom: '0.8rem' }}>
                             <h5 style={{ fontSize: 'var(--font-size-main)', marginBottom: '0.5rem', color: 'var(--text-main)' }}>{language === 'en' ? 'Target Skills (At least 1 required)' : '希望スキル設定 (最低1つは入力必須)'}</h5>
 
-                            <datalist id="skill-list-g1">{SKILL_OPTS_G1.map(s => <option key={s} value={language === 'en' ? translateSkill(s, language) : s} />)}</datalist>
-                            <datalist id="skill-list-g2">{SKILL_OPTS_G2.map(s => <option key={s} value={language === 'en' ? translateSkill(s, language) : s} />)}</datalist>
-                            <datalist id="skill-list-g3">{SKILL_OPTS_G3.map(s => <option key={s} value={language === 'en' ? translateSkill(s, language) : s} />)}</datalist>
-
                             {[1, 2, 3, 4].map(num => {
                                 const k = `skill${num}` as keyof typeof skills;
                                 const isG1 = num === 1 || num === 2;
                                 const groupName = isG1 ? 'G1' : (num === 3 ? 'G2' : 'G3');
-                                const listId = isG1 ? 'skill-list-g1' : (num === 3 ? 'skill-list-g2' : 'skill-list-g3');
+                                const options = isG1 ? skillOptionSets.g1 : (num === 3 ? skillOptionSets.g2 : skillOptionSets.g3);
 
                                 return (
                                     <div key={k} style={{ display: 'flex', gap: '0.8rem', marginBottom: '0.4rem', alignItems: 'center', background: 'rgba(0,0,0,0.2)', padding: '0.3rem 0.6rem', borderRadius: '6px' }}>
                                         <div style={{ width: '60px', color: 'var(--text-muted)', fontSize: '11px', lineHeight: 1.1 }}>{language === 'en' ? `Skill ${num}` : `スキル${num}`} <br /><small>({groupName})</small></div>
-                                        <input
-                                            className="input"
-                                            list={listId}
-                                            placeholder={language === 'en' ? 'Skill Name (Optional)' : `スキル名 (空欄可)`}
+                                        <SkillSuggestInput
                                             value={language === 'en' ? translateSkill(skills[k], language) : skills[k]}
-                                            onChange={e => {
-                                                let val = e.target.value;
+                                            options={options}
+                                            placeholder={language === 'en' ? 'Skill Name (Optional)' : `スキル名 (空欄可)`}
+                                            showListLabel={language === 'en' ? 'Show skill suggestions' : 'スキル候補を表示'}
+                                            onChange={val => {
+                                                let v = val;
                                                 if (language === 'en') {
-                                                    val = reverseTranslateSkill(val, language);
+                                                    v = reverseTranslateSkill(v, language);
                                                 }
-                                                setSkills({ ...skills, [k]: val });
+                                                setSkills({ ...skills, [k]: v });
                                             }}
                                             onBlur={(e) => {
                                                 if (e.target.value.trim() === '') {
@@ -1057,7 +1038,6 @@ export default function CriteriaTab() {
                                                     setSkillMustMatch(prev => ({ ...prev, [k]: false }));
                                                 }
                                             }}
-                                            style={{ flex: 1 }}
                                         />
                                         <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', minWidth: '90px' }}>
                                             <input
@@ -1170,7 +1150,7 @@ export default function CriteriaTab() {
                             </div>
 
                             {excludeSkillsUI.map((item, idx) => {
-                                const listId = item.group === 'G1' ? 'skill-list-g1' : (item.group === 'G2' ? 'skill-list-g2' : 'skill-list-g3');
+                                const options = item.group === 'G1' ? skillOptionSets.g1 : (item.group === 'G2' ? skillOptionSets.g2 : skillOptionSets.g3);
                                 return (
                                     <div key={item.id} style={{ display: 'flex', gap: '0.8rem', marginBottom: '0.6rem', alignItems: 'center' }}>
                                         <select
@@ -1188,21 +1168,21 @@ export default function CriteriaTab() {
                                             <option value="G2">G2</option>
                                             <option value="G3">G3</option>
                                         </select>
-                                        <input
-                                            className="input"
-                                            list={listId}
-                                            placeholder={language === 'en' ? 'Skill to exclude (Optional)' : `除外スキル (空欄可)`}
+                                        <SkillSuggestInput
                                             value={language === 'en' ? translateSkill(item.skill, language) : item.skill}
-                                            onChange={e => {
-                                                let val = e.target.value;
+                                            options={options}
+                                            placeholder={language === 'en' ? 'Skill to exclude (Optional)' : `除外スキル (空欄可)`}
+                                            showListLabel={language === 'en' ? 'Show skill suggestions' : 'スキル候補を表示'}
+                                            onChange={val => {
+                                                let v = val;
                                                 if (language === 'en') {
-                                                    val = reverseTranslateSkill(val, language);
+                                                    v = reverseTranslateSkill(v, language);
                                                 }
                                                 const newEx = [...excludeSkillsUI];
-                                                newEx[idx].skill = val;
+                                                newEx[idx].skill = v;
                                                 setExcludeSkillsUI(newEx);
                                             }}
-                                            style={{ flex: 1, padding: '0.3rem 0.6rem' }}
+                                            compact
                                         />
                                         <button
                                             title={language === 'en' ? 'Remove' : '削除'}
@@ -1609,7 +1589,7 @@ export default function CriteriaTab() {
                                                                                             }}>
                                                                                                 {currentDesign.useWeaponIconsInTables ? (
                                                                                                     <div style={isSlanted ? { display: 'flex', alignItems: 'flex-end', height: '100%', paddingBottom: '2px', transform: 'none', margin: 0, width: '100%', justifyContent: 'center' } : undefined}>
-                                                                                                        <WeaponIcon kind={k} size="1.5em" style={{ verticalAlign: 'middle', color: 'var(--text-muted)' }} />
+                                                                                                        <WeaponIcon kind={k} size="1.5em" style={{ verticalAlign: 'middle', color: 'var(--text-muted)' }} label={namesShort[k]} />
                                                                                                     </div>
                                                                                                 ) : (
                                                                                                     isSlanted ? <div>{namesShort[k]}</div> : <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>{namesShort[k]}</span>
@@ -1687,7 +1667,7 @@ export default function CriteriaTab() {
                                                                                         <tr key={k} style={{ background: idx % 2 === 0 ? 'rgba(128, 128, 128, 0.05)' : 'transparent' }}>
                                                                                             <td style={{ padding: '2px 6px', color: 'var(--text-muted)', fontWeight: 600, textAlign: 'right', whiteSpace: 'nowrap', borderRight: '1px solid var(--panel-border)', borderBottom: '1px solid var(--dim-border)' }}>
                                                                                             {currentDesign.useWeaponIconsInTables ? (
-                                                                                                <WeaponIcon kind={k} size="1.5em" style={{ verticalAlign: 'middle', color: 'var(--text-muted)' }} />
+                                                                                                <WeaponIcon kind={k} size="1.5em" style={{ verticalAlign: 'middle', color: 'var(--text-muted)' }} label={namesShort[k]} />
                                                                                             ) : (
                                                                                                 namesShort[k]
                                                                                             )}

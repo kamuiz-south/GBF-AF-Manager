@@ -1,9 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Search, ArrowUpDown, Heart, Package, Star, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Settings as SettingsIcon } from 'lucide-react';
+import { Search, ArrowUpDown, ArrowUp, ArrowDown, Heart, Package, Star, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Settings as SettingsIcon } from 'lucide-react';
 import { db } from '../db';
 import { MAX_AF_INVENTORY } from '../constants';
-import type { AppArtifact } from '../types';
+import { DEFAULT_DESIGN, type AppArtifact } from '../types';
 import { useTranslation, type TranslationKey } from '../i18n';
 import { useAppStore } from '../store/useAppStore';
 import { getCleanName } from '../utils/evaluator';
@@ -11,9 +11,213 @@ import { G1_SKILLS, G2_SKILLS, G3_SKILLS, SKILL_MASTER_BY_BASE_ID } from '../dat
 import { translateSkill } from '../utils/skillMapping';
 import { useSkillFilter } from '../hooks/useSkillFilter';
 import { SkillFilterPopup } from '../components/SkillFilterPopup';
+import { DEFAULT_PAGE_LIMIT } from '../data/defaultSettings';
+
+type SortField = keyof AppArtifact | 'inventoryOrder' | 'attr_kind' | 'memoText';
+
+const FALLBACK_COLUMN_WIDTHS = { id: 72, name: 180 };
+const EMPTY_ARTIFACTS: AppArtifact[] = [];
+const GAME_UI_COLUMNS = 5;
+const GAME_UI_ROWS = 4;
+const GAME_UI_ITEMS_PER_PAGE = GAME_UI_COLUMNS * GAME_UI_ROWS;
+
+const ROW_LABELS_JA = ['最上段', '上から2', '下から2', '最下段'];
+const ROW_LABELS_EN = ['top row', 'upper-middle row', 'lower-middle row', 'bottom row'];
+const COLUMN_LABELS_JA = ['左から1', '左から2', '中央', '右から2', '右から1'];
+const COLUMN_LABELS_EN = ['1st from left', '2nd from left', 'center', '2nd from right', '1st from right'];
+
+type InventoryPosition = {
+    page: number;
+    row: number;
+    column: number;
+};
+
+/**
+ * Resolve where an artifact appears in the in-game artifact list.
+ * AF Collector metadata is used when available; manually imported data
+ * falls back to the in-game 5 x 4 layout.
+ */
+function getInventoryPosition(artifact: AppArtifact): InventoryPosition | null {
+    let page: number | undefined = artifact._page;
+    let pos: number | undefined = artifact._pos;
+
+    if (
+        typeof page !== 'number' || !Number.isFinite(page) ||
+        typeof pos !== 'number' || !Number.isFinite(pos)
+    ) {
+        const order = artifact.inventoryOrder;
+        if (typeof order !== 'number' || !Number.isFinite(order) || order < 0) return null;
+
+        page = Math.floor(order / GAME_UI_ITEMS_PER_PAGE) + 1;
+        pos = order % GAME_UI_ITEMS_PER_PAGE;
+    }
+
+    if (
+        typeof page !== 'number' || !Number.isFinite(page) ||
+        typeof pos !== 'number' || !Number.isFinite(pos) ||
+        page < 1 || pos < 0 || pos >= GAME_UI_ITEMS_PER_PAGE
+    ) {
+        return null;
+    }
+
+    return {
+        page,
+        row: Math.floor(pos / GAME_UI_COLUMNS) + 1,
+        column: (pos % GAME_UI_COLUMNS) + 1,
+    };
+}
+
+function getRowLabel(row: number, language: 'ja' | 'en') {
+    return language === 'en'
+        ? (ROW_LABELS_EN[row - 1] ?? `row ${row} from top`)
+        : (ROW_LABELS_JA[row - 1] ?? `上から${row}`);
+}
+
+function getColumnLabel(column: number, language: 'ja' | 'en') {
+    return language === 'en'
+        ? (COLUMN_LABELS_EN[column - 1] ?? `column ${column} from left`)
+        : (COLUMN_LABELS_JA[column - 1] ?? `左から${column}`);
+}
+
+/** Convert ASCII digits to full-width digits for the Japanese tooltip. */
+function toFullWidthDigits(value: string) {
+    return value.replace(/[0-9]/g, digit => String.fromCharCode(digit.charCodeAt(0) + 0xFEE0));
+}
+
+function formatInventoryPosition(position: InventoryPosition, language: 'ja' | 'en') {
+    const row = getRowLabel(position.row, language);
+    const column = getColumnLabel(position.column, language);
+
+    if (language === 'en') {
+        return `Page ${position.page}, ${row}, ${column}`;
+    }
+
+    return toFullWidthDigits(`${position.page}P\u3000${row}\u3000${column}`);
+}
+
+function getArtifactNameTitle(artifact: AppArtifact, language: 'ja' | 'en') {
+    const position = getInventoryPosition(artifact);
+    if (!position) return artifact.name;
+
+    const detail = formatInventoryPosition(position, language);
+    return language === 'en'
+        ? `${artifact.name}\nIn-game: ${detail}`
+        : `${artifact.name}\nゲーム内表示：${detail}`;
+}
+
+/**
+ * Measure ID/Name column widths from the full owned-AF list.
+ * This runs only when the AF list or the relevant font settings change,
+ * not on pagination, filtering, or sorting.
+ */
+function measureFixedColumnWidths(
+    artifacts: AppArtifact[],
+    language: 'ja' | 'en',
+    fontSizeMain: number,
+    fontSizeSub: number,
+    fontFamilyMain: string,
+    fontFamilySub: string,
+) {
+    if (typeof document === 'undefined') return FALLBACK_COLUMN_WIDTHS;
+
+    const context = document.createElement('canvas').getContext('2d');
+    if (!context) return FALLBACK_COLUMN_WIDTHS;
+
+    const rootFontSize = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    const cellPadding = rootFontSize * 2;
+    const idHeaderExtra = rootFontSize * 0.3 + 14; // sort icon + gap
+    const buffer = 4;
+
+    // ID header (bold sub font) and ID values (normal sub font)
+    context.font = `600 ${fontSizeSub}px ${fontFamilySub}`;
+    let idWidth = context.measureText('ID').width + idHeaderExtra;
+
+    context.font = `${fontSizeSub}px ${fontFamilySub}`;
+    for (const artifact of artifacts) {
+        idWidth = Math.max(idWidth, context.measureText(String(artifact.id)).width);
+    }
+
+    // Name values (bold main font) and name header (bold sub font)
+    context.font = `600 ${fontSizeMain}px ${fontFamilyMain}`;
+    let nameWidth = 0;
+    for (const artifact of artifacts) {
+        nameWidth = Math.max(nameWidth, context.measureText(artifact.name).width);
+    }
+
+    context.font = `600 ${fontSizeSub}px ${fontFamilySub}`;
+    nameWidth = Math.max(nameWidth, context.measureText(language === 'en' ? 'Name' : '名前').width);
+
+    return {
+        id: Math.ceil(idWidth + cellPadding + buffer),
+        name: Math.ceil(nameWidth + cellPadding + buffer),
+    };
+}
+
+const activeSortHeaderStyle: React.CSSProperties = {
+    background: 'var(--dim-bg)',
+    boxShadow: 'inset 0 -2px 0 var(--accent-blue)',
+};
+
+function SortHeader({
+    field,
+    label,
+    activeField,
+    sortAsc,
+    onSort,
+    style,
+}: {
+    field: SortField;
+    label: string;
+    activeField: SortField;
+    sortAsc: boolean;
+    onSort: (field: SortField) => void;
+    style?: React.CSSProperties;
+}) {
+    const isActive = activeField === field;
+
+    return (
+        <th
+            style={isActive ? { ...(style ?? {}), ...activeSortHeaderStyle } : style}
+            aria-sort={isActive ? (sortAsc ? 'ascending' : 'descending') : undefined}
+        >
+            <button
+                type="button"
+                onClick={() => onSort(field)}
+                style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.3rem',
+                    cursor: 'pointer',
+                    background: 'transparent',
+                    border: 'none',
+                    color: isActive ? 'var(--text-main)' : 'var(--text-muted)',
+                    font: 'inherit',
+                    padding: 0,
+                    whiteSpace: 'nowrap',
+                }}
+            >
+                {label}
+                {isActive
+                    ? (sortAsc
+                        ? <ArrowUp size={14} color="var(--accent-blue)" aria-hidden="true" />
+                        : <ArrowDown size={14} color="var(--accent-blue)" aria-hidden="true" />)
+                    : <ArrowUpDown size={14} style={{ opacity: 0.45 }} aria-hidden="true" />}
+            </button>
+        </th>
+    );
+}
 
 export default function ListTab() {
     const { t, language } = useTranslation();
+    const design = useAppStore(state => state.globalSettings?.design);
+    const theme = design?.theme || 'dark';
+    const fontSizeMain = design?.fontSizeMain ?? DEFAULT_DESIGN.fontSizeMain;
+    const fontSizeSub = design?.fontSizeSub ?? DEFAULT_DESIGN.fontSizeSub;
+    const fontFamilyMain = design?.fontFamilyMain || DEFAULT_DESIGN.fontFamilyMain || 'sans-serif';
+    const fontFamilySub = design?.fontFamilySub || DEFAULT_DESIGN.fontFamilySub || 'sans-serif';
+    const [fontsReady, setFontsReady] = useState(() => (
+        typeof document === 'undefined' || !document.fonts || document.fonts.status === 'loaded'
+    ));
     const [searchTerm, setSearchTerm] = useState('');
     const [filterAttr, setFilterAttr] = useState('');
     const [filterKind, setFilterKind] = useState('');
@@ -30,12 +234,12 @@ export default function ListTab() {
         setIsSkillFilterOpen,
         matchesSkillFilter
     } = useSkillFilter();
-    const [sortField, setSortField] = useState<keyof AppArtifact | 'inventoryOrder' | 'attr_kind' | 'memoText'>('inventoryOrder');
+    const [sortField, setSortField] = useState<SortField>('inventoryOrder');
     const [sortAsc, setSortAsc] = useState(false);
 
     // Pagination state
     const [currentPage, setCurrentPage] = useState(1);
-    const [pageSize, setPageSize] = useState(10);
+    const [pageSize, setPageSize] = useState(DEFAULT_PAGE_LIMIT);
 
     // Initial load for page size from db
     useEffect(() => {
@@ -44,10 +248,34 @@ export default function ListTab() {
         });
     }, []);
 
+    // Re-measure once after web fonts finish loading.
+    useEffect(() => {
+        if (typeof document === 'undefined' || !document.fonts || document.fonts.status === 'loaded') return;
+
+        let cancelled = false;
+        document.fonts.ready
+            .then(() => {
+                if (!cancelled) setFontsReady(true);
+            })
+            .catch(() => {
+                if (!cancelled) setFontsReady(true);
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
     // Fetch all items from DB
-    const artifacts = useLiveQuery(() => db.artifacts.toArray()) || [];
+    const artifacts = useLiveQuery(() => db.artifacts.toArray()) ?? EMPTY_ARTIFACTS;
     const memos = useLiveQuery(() => db.memos.toArray()) || [];
     const conditions = useLiveQuery(() => db.conditions.toArray()) || [];
+
+    // Measure against the full owned-AF list so widths stay stable across pages/filters.
+    const columnWidths = useMemo(
+        () => measureFixedColumnWidths(artifacts, language, fontSizeMain, fontSizeSub, fontFamilyMain, fontFamilySub),
+        [artifacts, language, fontSizeMain, fontSizeSub, fontFamilyMain, fontFamilySub, fontsReady]
+    );
 
     const isLv5Search = /^(?:れべる|レベル|Level|Lv)\.?\s*[5５]$/i.test(searchTerm.trim());
     const isStar5Search = /^(?:★|☆|ほし|ホシ|星|star)\.?\s*[5５]$/i.test(searchTerm.trim());
@@ -145,7 +373,7 @@ export default function ListTab() {
         }
     };
 
-    const toggleSort = (field: keyof AppArtifact | 'inventoryOrder' | 'attr_kind' | 'memoText') => {
+    const toggleSort = (field: SortField) => {
         if (sortField === field) {
             setSortAsc(!sortAsc);
         } else {
@@ -191,8 +419,6 @@ export default function ListTab() {
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [totalPages, isSkillFilterOpen]);
-
-    const theme = useAppStore(state => state.globalSettings?.design?.theme) || 'dark';
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', height: '100%' }}>
@@ -314,54 +540,48 @@ export default function ListTab() {
 
             {/* Table Area */}
             <div id="list-scroll-container" tabIndex={-1} className="glass-panel" style={{ flex: 1, overflow: 'auto', borderRadius: '12px', outline: 'none' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '900px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: 'max(1100px, calc(var(--font-size-sub) * 95))' }}>
+                    <colgroup>
+                        <col style={{ width: `${columnWidths.id}px` }} />
+                        <col style={{ width: `${columnWidths.name}px` }} />
+                    </colgroup>
                     <thead style={{ position: 'sticky', top: 0, background: 'var(--panel-bg)', backdropFilter: 'blur(10px)', zIndex: 1 }}>
                         <tr>
-                            <th style={thStyle} onClick={() => toggleSort('id')}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', cursor: 'pointer' }}>ID <ArrowUpDown size={14} /></div>
-                            </th>
-                            <th style={thStyle}>{language === 'en' ? 'Name' : '名前'}</th>
-                            <th style={thStyle} onClick={() => toggleSort('attr_kind')}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', cursor: 'pointer' }}>{language === 'en' ? 'Attr / Wpn' : '属性・武器種'} <ArrowUpDown size={14} /></div>
-                            </th>
-                            <th style={thStyle} onClick={() => toggleSort('level')}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', cursor: 'pointer' }}>Lv <ArrowUpDown size={14} /></div>
-                            </th>
-                            <th style={thStyle} onClick={() => toggleSort('evaluationScore')}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', cursor: 'pointer' }}>{language === 'en' ? 'Score' : '評価値'} <ArrowUpDown size={14} /></div>
-                            </th>
+                            <SortHeader field="id" label="ID" activeField={sortField} sortAsc={sortAsc} onSort={toggleSort} style={{ ...thStyle, width: columnWidths.id, minWidth: columnWidths.id }} />
+                            <th style={{ ...thStyle, width: columnWidths.name, minWidth: columnWidths.name }}>{language === 'en' ? 'Name' : '名前'}</th>
+                            <SortHeader field="attr_kind" label={language === 'en' ? 'Attr / Wpn' : '属性・武器種'} activeField={sortField} sortAsc={sortAsc} onSort={toggleSort} style={thStyle} />
+                            <SortHeader field="level" label="Lv" activeField={sortField} sortAsc={sortAsc} onSort={toggleSort} style={thStyle} />
+                            <SortHeader field="evaluationScore" label={language === 'en' ? 'Score' : '評価値'} activeField={sortField} sortAsc={sortAsc} onSort={toggleSort} style={thStyle} />
                             <th style={thStyle}>{language === 'en' ? 'Skill 1' : 'スキル1'}</th>
                             <th style={thStyle}>{language === 'en' ? 'Skill 2' : 'スキル2'}</th>
                             <th style={thStyle}>{language === 'en' ? 'Skill 3' : 'スキル3'}</th>
                             <th style={thStyle}>{language === 'en' ? 'Skill 4' : 'スキル4'}</th>
-                            <th style={{ ...thStyle, minWidth: '130px' }}>{language === 'en' ? 'Status' : '状態'}</th>
-                            <th style={thStyle} onClick={() => toggleSort('memoText')}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', cursor: 'pointer' }}>{language === 'en' ? 'Memo' : 'メモ'} <ArrowUpDown size={14} /></div>
-                            </th>
+                            <th style={{ ...thStyle, minWidth: '260px' }}>{language === 'en' ? 'Status' : '状態'}</th>
+                            <SortHeader field="memoText" label={language === 'en' ? 'Memo' : 'メモ'} activeField={sortField} sortAsc={sortAsc} onSort={toggleSort} style={{ ...thStyle, minWidth: '320px' }} />
                         </tr>
                     </thead>
                     <tbody>
                         {paginatedItems.map(a => (
                             <tr key={a.id} style={{ borderBottom: '1px solid var(--panel-border)', backgroundColor: a.keepFlag ? 'rgba(59, 130, 246, 0.1)' : 'transparent' }}>
-                                <td style={tdStyle}>
-                                    <div style={{ fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)' }}>{a.id}</div>
+                                <td style={{ ...tdStyle, width: columnWidths.id, minWidth: columnWidths.id }}>
+                                    <div style={{ fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{a.id}</div>
                                 </td>
-                                <td style={tdStyle}>
-                                    <div style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px' }} title={a.name}>{a.name}</div>
+                                <td style={{ ...tdStyle, width: columnWidths.name, minWidth: columnWidths.name }}>
+                                    <div style={{ fontWeight: 600, whiteSpace: 'nowrap' }} title={getArtifactNameTitle(a, language)}>{a.name}</div>
                                 </td>
                                 <td style={tdStyle}><span style={{ minWidth: '4em', display: 'inline-block' }}>{t(`ATTR_${a.attribute}` as TranslationKey, a.attribute)} / {t(`WPN_${a.kind}` as TranslationKey, a.kind)}</span></td>
                                 <td style={tdStyle}>{a.level}/{a.max_level}</td>
                                 <td style={tdStyle}>
                                     <span style={{ color: 'var(--accent-gold)', fontWeight: 600 }}>{a.evaluationScore != null ? a.evaluationScore.toFixed(2) : '-'}</span>
                                 </td>
-                                <td style={tdStyle}><SkillCell skill={a.skill1_info} theme={theme} /></td>
-                                <td style={tdStyle}><SkillCell skill={a.skill2_info} theme={theme} /></td>
-                                <td style={tdStyle}><SkillCell skill={a.skill3_info} theme={theme} /></td>
-                                <td style={tdStyle}><SkillCell skill={a.skill4_info} theme={theme} /></td>
+                                <td style={tdStyle}><SkillCell skill={a.skill1_info} /></td>
+                                <td style={tdStyle}><SkillCell skill={a.skill2_info} /></td>
+                                <td style={tdStyle}><SkillCell skill={a.skill3_info} /></td>
+                                <td style={tdStyle}><SkillCell skill={a.skill4_info} /></td>
                                 <td style={tdStyle}>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', maxWidth: '160px' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', maxWidth: '260px' }}>
                                         <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-                                            {a.is_locked && <span style={{ fontSize: 'calc(var(--font-size-sub) * 0.87)', background: 'var(--accent-gold)', color: '#000', padding: '2px 4px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '3px', fontWeight: 600 }}><Heart size={12} /> {language === 'en' ? 'Fav' : 'お気に入り'}</span>}
+                                            {a.is_locked && <span style={{ fontSize: 'calc(var(--font-size-sub) * 0.87)', background: 'var(--favorite-tag-bg)', color: '#000', padding: '2px 4px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '3px', fontWeight: 600 }}><Heart size={12} /> {language === 'en' ? 'Fav' : 'お気に入り'}</span>}
                                             {a.is_unnecessary && <span style={{ fontSize: 'calc(var(--font-size-sub) * 0.87)', background: 'var(--accent-purple)', color: '#fff', padding: '2px 4px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '3px' }}><Package size={12} /> {language === 'en' ? 'Trash' : '不用品'}</span>}
                                             {a.keepFlag && <span style={{ fontSize: 'calc(var(--font-size-sub) * 0.87)', background: 'var(--accent-blue)', color: '#fff', padding: '2px 4px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '3px' }}><Star size={12} /> {language === 'en' ? 'Keep' : '確保提案'}</span>}
                                             {a.discardFlag && <span style={{ fontSize: 'calc(var(--font-size-sub) * 0.87)', background: 'var(--accent-danger)', color: '#fff', padding: '2px 4px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '3px' }}><Trash2 size={12} /> {language === 'en' ? 'Discard' : '廃棄提案'}</span>}
@@ -376,7 +596,7 @@ export default function ListTab() {
                                     <input
                                         type="text"
                                         className="input"
-                                        style={{ padding: '0.3rem 0.5rem', background: 'transparent', borderColor: 'transparent', borderBottomColor: 'var(--panel-border)', borderRadius: 0, minWidth: '160px' }}
+                                        style={{ padding: '0.3rem 0.5rem', background: 'transparent', borderColor: 'transparent', borderBottomColor: 'var(--panel-border)', borderRadius: 0, width: '100%', minWidth: '320px' }}
                                         placeholder={language === 'en' ? 'Memo...' : 'メモ...'}
                                         defaultValue={a.memoText}
                                         onBlur={(e) => {
@@ -388,8 +608,10 @@ export default function ListTab() {
                         ))}
                         {displayList.length === 0 && (
                             <tr>
-                                <td colSpan={9} style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                                    {language === 'en' ? 'No data. Please import JSON from the Data Tab.' : 'データがありません。AFデータ取得タブからJSONをインポートしてください。'}
+                                <td colSpan={11} style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                                    {artifacts.length === 0
+                                        ? (language === 'en' ? 'No data. Please import JSON from the Data Tab.' : 'データがありません。AFデータ取得タブからJSONをインポートしてください。')
+                                        : (language === 'en' ? 'No matching AFs.' : '該当AFはありません。')}
                                 </td>
                             </tr>
                         )}
@@ -446,17 +668,14 @@ export default function ListTab() {
     );
 }
 
-function SkillCell({ skill, theme }: { skill?: any, theme: string }) {
+function SkillCell({ skill }: { skill?: any }) {
     if (!skill || !skill.name) return <span style={{ color: 'var(--text-muted)' }}>-</span>;
 
     // Check if the skill is quality 5 to apply special colored styling
     const isMax = skill.skill_quality === 5;
     const isLevel5 = skill.level === 5;
-    const isDark = theme === 'dark';
 
-    const maxColor = isDark ? '#E3B7FF' : '#5D158A';
-    const borderCol = isDark ? '#5D158A' : '#E3B7FF';
-    const outlineStyle = `0px 0px 3px ${borderCol}, -1px -1px 0 ${borderCol}, 1px -1px 0 ${borderCol}, -1px 1px 0 ${borderCol}, 1px 1px 0 ${borderCol}`;
+    const outlineStyle = '0px 0px 3px var(--max-quality-outline), -1px -1px 0 var(--max-quality-outline), 1px -1px 0 var(--max-quality-outline), -1px 1px 0 var(--max-quality-outline), 1px 1px 0 var(--max-quality-outline)';
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxWidth: '160px' }}>
@@ -465,17 +684,17 @@ function SkillCell({ skill, theme }: { skill?: any, theme: string }) {
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'calc(var(--font-size-sub) * 0.94)' }}>
                 <span style={{ 
-                    color: isMax ? maxColor : 'var(--text-muted)',
+                    color: isMax ? 'var(--max-quality-text)' : 'var(--text-muted)',
                     textShadow: isMax ? outlineStyle : 'none'
                 }}>{skill.effect_value || `- Lv.${skill.level}`}</span>
                 <span style={{ 
-                    color: isMax ? maxColor : 'var(--accent-gold)', 
+                    color: isMax ? 'var(--max-quality-text)' : 'var(--accent-gold)', 
                     fontWeight: 500,
                     textShadow: isMax ? outlineStyle : 'none'
                 }}>
                     ★{skill.skill_quality}
                     <span style={{ 
-                        color: isLevel5 ? maxColor : 'var(--text-muted)', 
+                        color: isLevel5 ? 'var(--max-quality-text)' : 'var(--text-muted)', 
                         fontWeight: 500, 
                         marginLeft: '4px', 
                         fontSize: '0.9em',

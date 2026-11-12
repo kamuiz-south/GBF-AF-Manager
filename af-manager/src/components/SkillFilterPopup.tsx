@@ -1,7 +1,7 @@
 import { createPortal } from 'react-dom';
-import { useState, useEffect, useRef } from 'react';
+import { Fragment, useState, useEffect, useRef, type CSSProperties } from 'react';
 import { X, Plus, Trash2, Lock, Unlock } from 'lucide-react';
-import { G1_SKILLS, G2_SKILLS, G3_SKILLS } from '../data/skillMaster';
+import { G1_SKILLS, G2_SKILLS, G3_SKILLS, SKILL_MASTER_BY_BASE_ID } from '../data/skillMaster';
 import { translateSkill } from '../utils/skillMapping';
 
 interface Props {
@@ -17,6 +17,146 @@ interface Props {
     theme: string;
 }
 
+type MySetMode = 'normal' | 'register' | 'delete';
+
+interface ConfiguredField {
+    index: number;
+    skills: number[];
+}
+
+function getConfiguredFields(fields: number[][]): ConfiguredField[] {
+    return fields
+        .map((field, index) => ({
+            index,
+            skills: field.filter(baseId => baseId > 0),
+        }))
+        .filter(field => field.skills.length > 0);
+}
+
+function getSkillLabel(baseId: number, language: 'ja' | 'en') {
+    const skill = SKILL_MASTER_BY_BASE_ID.get(baseId);
+    if (!skill) {
+        return language === 'en' ? `Unknown (${baseId})` : `不明 (${baseId})`;
+    }
+    return translateSkill(skill.name, language);
+}
+
+interface MySetChipPreviewProps {
+    slot: number;
+    fields: ConfiguredField[];
+    locked: boolean;
+    language: 'ja' | 'en';
+    mode: MySetMode;
+    tooltipId: string;
+}
+
+function MySetChipPreview({ slot, fields, locked, language, mode, tooltipId }: MySetChipPreviewProps) {
+    const title = language === 'en' ? `My Set ${slot}` : `マイセット ${slot}`;
+    const actionHint = mode === 'register'
+        ? (locked
+            ? (language === 'en' ? 'Locked' : 'ロック中')
+            : (language === 'en' ? 'Click to overwrite this set' : 'クリックでこのセットに上書き'))
+        : mode === 'delete'
+            ? (locked
+                ? (language === 'en' ? 'Locked' : 'ロック中')
+                : (language === 'en' ? 'Click to delete this set' : 'クリックでこのセットを削除'))
+            : (language === 'en' ? 'Click to load this set' : 'クリックで読み込み');
+
+    const fieldCardStyle: CSSProperties = {
+        border: '1px solid var(--panel-border)',
+        borderRadius: '8px',
+        padding: '0.45rem 0.5rem',
+        background: 'var(--dim-bg)',
+    };
+    const fieldLabelStyle: CSSProperties = {
+        fontSize: 'calc(var(--font-size-sub) * 0.82)',
+        color: 'var(--text-muted)',
+        fontWeight: 600,
+        marginBottom: '0.3rem',
+    };
+    const chipStyle: CSSProperties = {
+        display: 'inline-flex',
+        alignItems: 'center',
+        maxWidth: '100%',
+        padding: '0.16rem 0.45rem',
+        borderRadius: '999px',
+        border: '1px solid var(--panel-border)',
+        background: 'var(--bg-color)',
+        color: 'var(--text-main)',
+        fontSize: 'calc(var(--font-size-sub) * 0.88)',
+        lineHeight: 1.35,
+        whiteSpace: 'normal',
+        wordBreak: 'break-word',
+    };
+    const orStyle: CSSProperties = {
+        flexShrink: 0,
+        margin: '0 0.1rem',
+        fontSize: '9px',
+        fontWeight: 700,
+        color: 'var(--text-muted)',
+    };
+    const andStyle: CSSProperties = {
+        textAlign: 'center',
+        margin: '0.1rem 0',
+        fontSize: '9px',
+        fontWeight: 700,
+        letterSpacing: '0.05em',
+        color: 'var(--accent-gold)',
+    };
+
+    return (
+        <div
+            id={tooltipId}
+            role="tooltip"
+            style={{
+                background: 'var(--bg-color)',
+                border: '2px solid var(--panel-border)',
+                borderRadius: '10px',
+                padding: '0.65rem 0.75rem',
+                boxShadow: '0 8px 30px rgba(0,0,0,0.55)',
+                color: 'var(--text-main)',
+                overflowY: 'auto',
+            }}
+        >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.5rem' }}>
+                <strong style={{ fontSize: 'var(--font-size-sub)' }}>{title}</strong>
+                {locked && <Lock size={12} color="var(--accent-gold)" />}
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                {fields.map((field, fieldIdx) => (
+                    <Fragment key={field.index}>
+                        {fieldIdx > 0 && <div style={andStyle}>AND</div>}
+                        <div style={fieldCardStyle}>
+                            <div style={fieldLabelStyle}>
+                                {language === 'en' ? `Condition ${field.index + 1}` : `条件${field.index + 1}`}
+                            </div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.3rem' }}>
+                                {field.skills.map((baseId, skillIdx) => (
+                                    <Fragment key={`${baseId}-${skillIdx}`}>
+                                        {skillIdx > 0 && <span style={orStyle}>OR</span>}
+                                        <span style={chipStyle}>{getSkillLabel(baseId, language)}</span>
+                                    </Fragment>
+                                ))}
+                            </div>
+                        </div>
+                    </Fragment>
+                ))}
+            </div>
+
+            <div style={{
+                marginTop: '0.5rem',
+                paddingTop: '0.4rem',
+                borderTop: '1px solid var(--panel-border)',
+                fontSize: 'calc(var(--font-size-sub) * 0.82)',
+                color: 'var(--text-muted)',
+            }}>
+                {actionHint}
+            </div>
+        </div>
+    );
+}
+
 export function SkillFilterPopup({
     isOpen,
     onClose,
@@ -29,8 +169,31 @@ export function SkillFilterPopup({
     language,
     theme,
 }: Props) {
-    const [mode, setMode] = useState<'normal' | 'register' | 'delete'>('normal');
+    const [mode, setMode] = useState<MySetMode>('normal');
+    const [hoveredSet, setHoveredSet] = useState<{ slot: number; rect: DOMRect } | null>(null);
     const presetAreaRef = useRef<HTMLDivElement>(null);
+    const tooltipRef = useRef<HTMLDivElement>(null);
+    const hideTooltipTimer = useRef<number | null>(null);
+
+    const cancelHideTooltip = () => {
+        if (hideTooltipTimer.current !== null) {
+            window.clearTimeout(hideTooltipTimer.current);
+            hideTooltipTimer.current = null;
+        }
+    };
+
+    const scheduleHideTooltip = () => {
+        cancelHideTooltip();
+        hideTooltipTimer.current = window.setTimeout(() => {
+            setHoveredSet(null);
+            hideTooltipTimer.current = null;
+        }, 120);
+    };
+
+    const showTooltipFor = (slot: number, element: HTMLElement) => {
+        cancelHideTooltip();
+        setHoveredSet({ slot, rect: element.getBoundingClientRect() });
+    };
 
     // キャンセル処理: マイセット領域外のクリック
     useEffect(() => {
@@ -48,16 +211,74 @@ export function SkillFilterPopup({
         setMode('normal');
     }, [skillFilterFields]);
 
+    useEffect(() => {
+        const clearAll = () => {
+            setHoveredSet(null);
+            cancelHideTooltip();
+        };
+        const handleScroll = (event: Event) => {
+            if (event.target instanceof Node && tooltipRef.current?.contains(event.target)) {
+                return;
+            }
+            clearAll();
+        };
+
+        window.addEventListener('scroll', handleScroll, true);
+        window.addEventListener('resize', clearAll);
+        return () => {
+            window.removeEventListener('scroll', handleScroll, true);
+            window.removeEventListener('resize', clearAll);
+            cancelHideTooltip();
+        };
+    }, []);
+
+    const handleClose = () => {
+        cancelHideTooltip();
+        setHoveredSet(null);
+        onClose();
+    };
+
     if (!isOpen) return null;
 
+    const hoveredMySet = hoveredSet ? skillFilterMySets[hoveredSet.slot] : undefined;
+    const hoveredFields = hoveredMySet ? getConfiguredFields(hoveredMySet.fields) : [];
+    const showTooltip = !!hoveredSet && hoveredFields.length > 0;
+    let tooltipStyle: CSSProperties | null = null;
+
+    if (showTooltip && hoveredSet) {
+        const margin = 8;
+        const width = Math.min(360, window.innerWidth - margin * 2);
+        const left = Math.min(
+            Math.max(hoveredSet.rect.left + hoveredSet.rect.width / 2 - width / 2, margin),
+            window.innerWidth - width - margin
+        );
+        const spaceAbove = hoveredSet.rect.top - 16;
+        const spaceBelow = window.innerHeight - hoveredSet.rect.bottom - 16;
+        const placeBelow = spaceAbove < 220 && spaceBelow > spaceAbove;
+        const availableHeight = placeBelow ? spaceBelow : spaceAbove;
+
+        tooltipStyle = {
+            position: 'fixed',
+            left,
+            top: placeBelow ? hoveredSet.rect.bottom + margin : hoveredSet.rect.top - margin,
+            width,
+            maxHeight: Math.max(120, Math.min(420, availableHeight)),
+            transform: placeBelow ? undefined : 'translateY(-100%)',
+            zIndex: 10050,
+            pointerEvents: 'auto',
+            overflowY: 'auto',
+        };
+    }
+
     return createPortal(
-        <div
-            style={{
-                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+        <>
+            <div
+                style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
                 background: 'rgba(0,0,0,0.5)', zIndex: 9999,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
-            onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+            onClick={e => { if (e.target === e.currentTarget) handleClose(); }}
         >
             <div style={{
                 background: 'var(--bg-color)',
@@ -75,7 +296,7 @@ export function SkillFilterPopup({
                     <h3 style={{ margin: 0, fontSize: 'var(--font-size-main)', fontWeight: 700 }}>
                         {language === 'en' ? 'Skill Filter Settings' : 'スキルフィルター設定'}
                     </h3>
-                    <button className="btn btn-ghost" style={{ padding: '0.3rem' }} onClick={onClose}>
+                    <button className="btn btn-ghost" style={{ padding: '0.3rem' }} onClick={handleClose}>
                         <X size={18} />
                     </button>
                 </div>
@@ -195,6 +416,9 @@ export function SkillFilterPopup({
                                 const mySet = skillFilterMySets[slot];
                                 const hasData = !!mySet && mySet.fields.some(f => f.length > 0);
                                 const isLocked = mySet?.locked || false;
+                                const configuredFields = mySet ? getConfiguredFields(mySet.fields) : [];
+                                const hasConfiguredSkills = configuredFields.length > 0;
+                                const mySetLabel = language === 'en' ? `My Set ${slot}` : `マイセット ${slot}`;
                                 
                                 let animation = 'none';
                                 if (mode === 'register' && !isLocked) animation = 'pulse-green 1.5s infinite';
@@ -224,7 +448,15 @@ export function SkillFilterPopup({
                                             animation: animation,
                                             position: 'relative'
                                         }}
+                                        onMouseEnter={e => { if (hasConfiguredSkills) showTooltipFor(slot, e.currentTarget); }}
+                                        onMouseLeave={() => { if (hasConfiguredSkills) scheduleHideTooltip(); }}
+                                        onFocus={e => { if (hasConfiguredSkills) showTooltipFor(slot, e.currentTarget); }}
+                                        onBlur={() => { if (hasConfiguredSkills) scheduleHideTooltip(); }}
+                                        aria-describedby={hasConfiguredSkills && hoveredSet?.slot === slot ? `my-set-tooltip-${slot}` : undefined}
+                                        aria-label={`${mySetLabel}${hasData ? '' : (language === 'en' ? ' (empty)' : '（未登録）')}`}
                                         onClick={() => {
+                                            cancelHideTooltip();
+                                            setHoveredSet(null);
                                             if (mode === 'register') {
                                                 if (!isLocked && saveMySet) {
                                                     saveMySet(slot, skillFilterFields);
@@ -242,8 +474,9 @@ export function SkillFilterPopup({
                                             }
                                         }}
                                         title={
-                                            mode === 'register' ? (isLocked ? 'Locked' : 'Save to My Set') 
-                                            : mode === 'delete' ? (isLocked ? 'Locked' : 'Delete My Set') 
+                                            hasConfiguredSkills ? undefined
+                                            : mode === 'register' ? (isLocked ? 'Locked' : 'Save to My Set')
+                                            : mode === 'delete' ? (isLocked ? 'Locked' : 'Delete My Set')
                                             : 'Load My Set'
                                         }
                                     >
@@ -349,7 +582,25 @@ export function SkillFilterPopup({
                     }
                 `}</style>
             </div>
-        </div>,
+            </div>
+            {showTooltip && hoveredSet && tooltipStyle && hoveredMySet && (
+                <div
+                    ref={tooltipRef}
+                    style={tooltipStyle}
+                    onMouseEnter={cancelHideTooltip}
+                    onMouseLeave={scheduleHideTooltip}
+                >
+                    <MySetChipPreview
+                        slot={hoveredSet.slot}
+                        fields={hoveredFields}
+                        locked={hoveredMySet.locked}
+                        language={language}
+                        mode={mode}
+                        tooltipId={`my-set-tooltip-${hoveredSet.slot}`}
+                    />
+                </div>
+            )}
+        </>,
         document.body
     );
 }

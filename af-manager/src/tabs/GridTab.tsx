@@ -199,7 +199,7 @@ export default function GridTab() {
                             </div>
                             <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
                                 <div style={{ display: 'flex', gap: '0.15rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                                    {selectedArtifact.is_locked && <span style={{ fontSize: 'calc(var(--font-size-sub) * 0.87)', background: 'var(--accent-gold)', color: '#000', padding: '2px 5px', borderRadius: '4px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px', whiteSpace: 'nowrap' }}><Heart size={13} /> {language === 'en' ? 'Fav' : 'お気に入り'}</span>}
+                                    {selectedArtifact.is_locked && <span style={{ fontSize: 'calc(var(--font-size-sub) * 0.87)', background: 'var(--favorite-tag-bg)', color: '#000', padding: '2px 5px', borderRadius: '4px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px', whiteSpace: 'nowrap' }}><Heart size={13} /> {language === 'en' ? 'Fav' : 'お気に入り'}</span>}
                                     {selectedArtifact.is_unnecessary && <span style={{ fontSize: 'calc(var(--font-size-sub) * 0.87)', background: 'var(--accent-purple)', color: '#fff', padding: '2px 5px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '3px', whiteSpace: 'nowrap' }}><Package size={13} /> {language === 'en' ? 'Trash' : '不用品'}</span>}
                                     {selectedArtifact.discardFlag && <span style={{ fontSize: 'calc(var(--font-size-sub) * 0.87)', background: 'var(--accent-danger)', color: '#fff', padding: '2px 5px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '3px', whiteSpace: 'nowrap' }}><Trash2 size={13} /> {language === 'en' ? 'Discard' : '廃棄提案'}</span>}
                                     {selectedArtifact.keepFlag && <span style={{ fontSize: 'calc(var(--font-size-sub) * 0.87)', background: 'var(--accent-blue)', color: '#fff', padding: '2px 5px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '3px', whiteSpace: 'nowrap' }}><Star size={13} /> {language === 'en' ? 'Keep' : '確保提案'}</span>}
@@ -214,10 +214,10 @@ export default function GridTab() {
                         </div>
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', flex: 1 }}>
-                            <SkillRow skill={selectedArtifact.skill1_info} group={1} noWrap={detailSkillNoWrap} theme={settings?.design?.theme || 'dark'} />
-                            <SkillRow skill={selectedArtifact.skill2_info} group={1} noWrap={detailSkillNoWrap} theme={settings?.design?.theme || 'dark'} />
-                            <SkillRow skill={selectedArtifact.skill3_info} group={2} noWrap={detailSkillNoWrap} theme={settings?.design?.theme || 'dark'} />
-                            <SkillRow skill={selectedArtifact.skill4_info} group={3} noWrap={detailSkillNoWrap} theme={settings?.design?.theme || 'dark'} />
+                            <SkillRow skill={selectedArtifact.skill1_info} group={1} noWrap={detailSkillNoWrap} />
+                            <SkillRow skill={selectedArtifact.skill2_info} group={1} noWrap={detailSkillNoWrap} />
+                            <SkillRow skill={selectedArtifact.skill3_info} group={2} noWrap={detailSkillNoWrap} />
+                            <SkillRow skill={selectedArtifact.skill4_info} group={3} noWrap={detailSkillNoWrap} />
 
                                 {getEquippedCharacter(selectedArtifact, language)}
 
@@ -469,6 +469,7 @@ export default function GridTab() {
                                             <WeaponIcon 
                                                 kind={item.kind} 
                                                 size={Math.round((settings.design.gridWeaponFontSize ?? 19) * 1.3)} 
+                                                label={t(`WPN_${item.kind}` as TranslationKey, String(item.kind))}
                                             />
                                             {settings?.design?.useWeaponIconsWithText && (
                                                 <span>
@@ -611,14 +612,11 @@ function getEquippedCharacter(artifact: any, language: string) {
     );
 }
 
-function SkillRow({ skill, group, noWrap, theme }: { skill?: any; group: 1 | 2 | 3, noWrap?: boolean, theme?: string }) {
+function SkillRow({ skill, group, noWrap }: { skill?: any; group: 1 | 2 | 3, noWrap?: boolean }) {
     if (!skill || !skill.name) return <div style={{ background: 'rgba(0,0,0,0.1)', borderRadius: '8px', padding: '0.6rem 0.8rem', display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}>-</div>;
 
     const isMax = skill.skill_quality === 5;
-    const isDark = theme === 'dark';
-    const maxColor = isDark ? '#E3B7FF' : '#5D158A';
-    const borderCol = isDark ? '#5D158A' : '#E3B7FF';
-    const outlineStyle = `0px 0px 3px ${borderCol}, -1px -1px 0 ${borderCol}, 1px -1px 0 ${borderCol}, -1px 1px 0 ${borderCol}, 1px 1px 0 ${borderCol}`;
+    const outlineStyle = '0px 0px 3px var(--max-quality-outline), -1px -1px 0 var(--max-quality-outline), 1px -1px 0 var(--max-quality-outline), -1px 1px 0 var(--max-quality-outline), 1px 1px 0 var(--max-quality-outline)';
     const groupLabel = group === 1 ? '[Ⅰ]' : group === 2 ? '[Ⅱ]' : '[Ⅲ]';
     const groupColor = 'var(--accent-success)'; // teal/green equivalent
 
@@ -626,7 +624,7 @@ function SkillRow({ skill, group, noWrap, theme }: { skill?: any; group: 1 | 2 |
         <div style={{ background: 'var(--criteria-detail-bg)', padding: '0.5rem 0.8rem', borderRadius: '8px', border: '1px solid var(--dim-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: 0 }}>
                 <span style={{ 
-                    color: isMax ? maxColor : 'var(--accent-gold)', 
+                    color: isMax ? 'var(--max-quality-text)' : 'var(--accent-gold)', 
                     fontWeight: 500, 
                     minWidth: '36px', 
                     flexShrink: 0,
@@ -650,7 +648,7 @@ function SkillRow({ skill, group, noWrap, theme }: { skill?: any; group: 1 | 2 |
                 </span>
             </div>
             <span style={{ 
-                color: isMax ? maxColor : 'var(--accent-blue-hover)', 
+                color: isMax ? 'var(--max-quality-text)' : 'var(--accent-blue-hover)', 
                 fontSize: 'var(--font-size-sub)', 
                 fontWeight: 600, 
                 marginLeft: '0.8rem', 

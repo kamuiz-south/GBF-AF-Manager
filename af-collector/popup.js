@@ -220,3 +220,9 @@ chrome.runtime.sendMessage({ type: 'GET_AUTO_DL' }, (res) => {
 chkAutoDl.addEventListener('change', () => {
     chrome.runtime.sendMessage({ type: 'SET_AUTO_DL', value: chkAutoDl.checked });
 });
+
+// 接続設定（ポート自動検出／固定ポート）
+document.getElementById('openOptions')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    chrome.runtime.openOptionsPage();
+});

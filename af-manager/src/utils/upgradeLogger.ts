@@ -1,5 +1,6 @@
 import { db } from '../db';
 import type { AppArtifact, Condition, UpgradeLogEntry } from '../types';
+import { DEFAULT_UPGRADE_LOG_MAX_COUNT } from '../data/defaultSettings';
 
 /**
  * 確保フラグ計算の直前に呼ぶ。
@@ -89,6 +90,8 @@ export async function generateUpgradeLog(
                 [...oldIds].every(id => newIds.has(id));
             if (same) continue;
 
+            // 共通AFも保存する。表示時に「更新前後の差分のみ」か
+            // 「確保AFをすべて」かを設定で切り替えられるようにするため。
             // キーを分解
             const parts = key.split('__');
             const condId = parts[0];
@@ -108,6 +111,13 @@ export async function generateUpgradeLog(
                 weaponKind = sample?.kind ?? '';
             }
 
+            const isMethod2 = cond?.methodType === 2 || isCharKey;
+            const targetCount = cond
+                ? (isMethod2
+                    ? cond.targetCountMethod2
+                    : cond.targetCount?.[`${attribute}_${weaponKind}`])
+                : undefined;
+
             entries.push({
                 conditionId: condId,
                 conditionName: cond?.name ?? condId,
@@ -116,8 +126,10 @@ export async function generateUpgradeLog(
                 weaponKind,
                 oldArtifacts: oldList,
                 newArtifacts: newList,
-                methodType: cond?.methodType,
+                methodType: cond?.methodType ?? (isCharKey ? 2 : 1),
                 characterName: isCharKey ? (cond?.characterName || '') : undefined,
+                targetCount,
+                newKeptCount: newList.length,
             });
         }
 
@@ -136,7 +148,7 @@ export async function generateUpgradeLog(
 
         // 上限件数を超えた古いログを削除
         const settings = await db.settings.get('global');
-        const maxCount = settings?.upgradeLogMaxCount ?? 20;
+        const maxCount = settings?.upgradeLogMaxCount ?? DEFAULT_UPGRADE_LOG_MAX_COUNT;
         const allLogs = await db.upgradeLogs.orderBy('timestamp').toArray();
         if (allLogs.length > maxCount) {
             const toDelete = allLogs.slice(0, allLogs.length - maxCount);

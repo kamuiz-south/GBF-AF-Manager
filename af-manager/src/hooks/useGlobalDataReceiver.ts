@@ -8,13 +8,7 @@ import { saveKeepFlagSnapshot, generateUpgradeLog } from '../utils/upgradeLogger
 import type { Settings } from '../types';
 import { useTranslation } from '../i18n';
 import { useAppStore } from '../store/useAppStore';
-import { MAX_AF_INVENTORY } from '../constants';
-
-const DEFAULT_SETTINGS: Settings = {
-    id: 'global',
-    evaluationFormula: { group1Multiplier: 1, group2Multiplier: 1, group3Multiplier: 1, skillMultipliers: {}, qualityValues: {}, exceptions: [] },
-    discardBehavior: { treatUnnecessaryAsDiscard: true, targetInventoryCount: MAX_AF_INVENTORY, protectLocked: true, protectKeepFlag: true, protectRareAF: true, protectEquipped: true },
-};
+import { DEFAULT_SETTINGS, DEFAULT_AUTO_FLAG_UPDATE } from '../data/defaultSettings';
 
 const getSettings = async (): Promise<Settings> => {
     let s = await db.settings.get('global');
@@ -62,8 +56,8 @@ export function useCollectorImport() {
         await db.artifacts.bulkPut(newItems);
         await recordImportTimestamp();
 
-        const autoKeep = settings.autoFlagUpdate?.keepFlag ?? false;
-        const autoDiscard = settings.autoFlagUpdate?.discardFlag ?? false;
+        const autoKeep = settings.autoFlagUpdate?.keepFlag ?? DEFAULT_AUTO_FLAG_UPDATE.keepFlag;
+        const autoDiscard = settings.autoFlagUpdate?.discardFlag ?? DEFAULT_AUTO_FLAG_UPDATE.discardFlag;
 
         if (!autoKeep && !autoDiscard) {
             showToast(language === 'en' ? `✅ Imported ${newItems.length} artifacts (${json.total_pages} pages). Please run the Keep condition calculations next.` : `✅ ${newItems.length}件のAFを取り込みました（${json.total_pages}ページ分）。確保フラグ計算を実行してください。`, 'success');
@@ -140,7 +134,7 @@ export function useGlobalDataReceiver() {
                         }
                     });
                 });
-            } catch (_) {
+            } catch {
                 // Tauri環境外ではスキップ
             }
         })();

@@ -3,6 +3,14 @@
  * 収集状態の管理、ページデータの蓄積、完了判定、ファイルダウンロードを担当。
  */
 
+const APP_IDENTIFIER = 'gbf-af-manager';
+const APP_API_VERSION = 1;
+const DEFAULT_APP_PORT = 1422;
+const APP_PORT_RANGE_END = 1432;
+const APP_CONNECTION_CACHE_KEY = 'af_app_connection';
+const APP_CONNECTION_CACHE_MS = 5 * 60 * 1000;
+const APP_DISCOVERY_TIMEOUT_MS = 350;
+
 // ---------- 状態 ----------
 let state = {
     collecting: false,
@@ -160,6 +168,150 @@ async function downloadData() {
     await chrome.downloads.download({ url, filename: `af_data_${date}.json`, saveAs: false });
 }
 
+// ---------- AF Manager 接続先の検出 ----------
+async function getConnectionSettings() {
+    const stored = await chrome.storage.local.get({
+        afConnectionMode: 'auto',
+        afFixedPort: DEFAULT_APP_PORT,
+    });
+    const fixedPort = Number(stored.afFixedPort);
+    return {
+        mode: stored.afConnectionMode === 'fixed' ? 'fixed' : 'auto',
+        fixedPort: Number.isInteger(fixedPort) && fixedPort >= 1024 && fixedPort <= 65535
+            ? fixedPort
+            : DEFAULT_APP_PORT,
+    };
+}
+
+async function readCachedAppConnection() {
+    const stored = await chrome.storage.local.get(APP_CONNECTION_CACHE_KEY);
+    const cached = stored[APP_CONNECTION_CACHE_KEY];
+    if (!cached || !Number.isInteger(cached.port) || Date.now() - (cached.checkedAt || 0) > APP_CONNECTION_CACHE_MS) {
+        return null;
+    }
+    return cached;
+}
+
+async function writeCachedAppConnection(info) {
+    await chrome.storage.local.set({
+        [APP_CONNECTION_CACHE_KEY]: { ...info, checkedAt: Date.now() },
+    });
+}
+
+async function clearCachedAppConnection() {
+    await chrome.storage.local.remove(APP_CONNECTION_CACHE_KEY);
+}
+
+async function pingAppPort(port) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), APP_DISCOVERY_TIMEOUT_MS);
+    try {
+        const res = await fetch(`http://127.0.0.1:${port}/api/ping`, {
+            cache: 'no-store',
+            signal: controller.signal,
+        });
+        if (!res.ok) return null;
+        const info = await res.json();
+        if (info?.app !== APP_IDENTIFIER || typeof info.apiVersion !== 'number' || info.apiVersion < APP_API_VERSION) {
+            return null;
+        }
+        return { ...info, port: Number(info.port) || port };
+    } catch {
+        return null;
+    } finally {
+        clearTimeout(timeout);
+    }
+}
+
+async function discoverAppConnection() {
+    const cached = await readCachedAppConnection();
+    if (cached) {
+        const verified = await pingAppPort(cached.port);
+        if (verified) {
+            await writeCachedAppConnection(verified);
+            return verified;
+        }
+        await clearCachedAppConnection();
+    }
+
+    const { mode, fixedPort } = await getConnectionSettings();
+    const ports = [];
+    if (mode === 'fixed') {
+        ports.push(fixedPort);
+    } else {
+        for (let port = DEFAULT_APP_PORT; port <= APP_PORT_RANGE_END; port++) {
+            ports.push(port);
+        }
+    }
+
+    for (const port of ports) {
+        const info = await pingAppPort(port);
+        if (info) {
+            await writeCachedAppConnection(info);
+            return info;
+        }
+    }
+    return null;
+}
+
+async function postArtifactsToPort(port, payload) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    try {
+        const res = await fetch(`http://127.0.0.1:${port}/api/artifacts`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            signal: controller.signal,
+        });
+        return res.ok;
+    } catch {
+        return false;
+    } finally {
+        clearTimeout(timeout);
+    }
+}
+
+async function sendToBrowserTab(payload) {
+    const patterns = ['http://localhost:*/*', 'http://127.0.0.1:*/*', 'https://*.github.io/*'];
+    const seen = new Set();
+    const candidates = [];
+
+    for (const pattern of patterns) {
+        const tabs = await chrome.tabs.query({ url: pattern });
+        for (const tab of tabs) {
+            if (!tab.id || seen.has(tab.id)) continue;
+            seen.add(tab.id);
+            candidates.push(tab);
+        }
+    }
+
+    for (const tab of candidates) {
+        try {
+            // 旧版のように最初のlocalhostタブへ送るのではなく、
+            // AF Manager自身の識別応答を確認してから送信する。
+            const info = await chrome.tabs.sendMessage(tab.id, { type: 'AF_PING' });
+            if (info?.app !== APP_IDENTIFIER) continue;
+            await chrome.tabs.sendMessage(tab.id, { type: 'AF_PUSH', payload });
+            return true;
+        } catch {
+            // コンテンツスクリプト未注入・対象外ページなど
+        }
+    }
+
+    // 拡張機能更新直後などでAF_PINGに未対応の旧コンテンツスクリプトが
+    // 残っている場合、候補が1つだけなら従来どおり送信する。
+    if (candidates.length === 1) {
+        try {
+            await chrome.tabs.sendMessage(candidates[0].id, { type: 'AF_PUSH', payload });
+            return true;
+        } catch {
+            // 送信先なし
+        }
+    }
+    return false;
+}
+
 // ---------- メッセージハンドラ ----------
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     switch (msg.type) {
@@ -218,34 +370,36 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
                 const payload = buildExportJson();
 
                 // --- Phase 3: Tauri デスクトップアプリへ POST ---
-                try {
-                    const res = await fetch('http://127.0.0.1:1422/api/artifacts', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload),
-                    });
-                    if (res.ok) {
-                        sendResponse({ ok: true, mode: 'tauri' });
+                // 新アプリは /api/ping で実際の待受ポートを公開する。
+                let connection = await discoverAppConnection();
+                if (connection && await postArtifactsToPort(connection.port, payload)) {
+                    sendResponse({ ok: true, mode: 'tauri', port: connection.port });
+                    return;
+                }
+
+                // ポート変更後の初回送信などでキャッシュが古い場合は再探索
+                if (connection) {
+                    await clearCachedAppConnection();
+                    connection = await discoverAppConnection();
+                    if (connection && await postArtifactsToPort(connection.port, payload)) {
+                        sendResponse({ ok: true, mode: 'tauri', port: connection.port });
                         return;
                     }
-                } catch (_) {
-                    // Tauri アプリ未起動 → Phase 2 へフォールバック
+                }
+
+                // --- 旧アプリ互換: /api/ping を持たない1422固定版 ---
+                if (await postArtifactsToPort(DEFAULT_APP_PORT, payload)) {
+                    sendResponse({ ok: true, mode: 'tauri-legacy', port: DEFAULT_APP_PORT });
+                    return;
                 }
 
                 // --- Phase 2: 同一ブラウザの AF Manager タブへ送信 ---
-                const patterns = ['http://localhost:*/*', 'http://127.0.0.1:*/*', 'https://*.github.io/*'];
-                let targetTab = null;
-                for (const pattern of patterns) {
-                    const tabs = await chrome.tabs.query({ url: pattern });
-                    if (tabs.length > 0) { targetTab = tabs[0]; break; }
-                }
-                if (!targetTab) {
-                    sendResponse({ ok: false, reason: 'AF Manager（アプリ/ブラウザ）が見つかりません。\nTauriアプリを起動するか、同ブラウザでAF Managerを開いてください。' });
+                if (await sendToBrowserTab(payload)) {
+                    sendResponse({ ok: true, mode: 'browser' });
                     return;
                 }
-                chrome.tabs.sendMessage(targetTab.id, { type: 'AF_PUSH', payload })
-                    .then(() => sendResponse({ ok: true, mode: 'browser' }))
-                    .catch(err => sendResponse({ ok: false, reason: err.message }));
+
+                sendResponse({ ok: false, reason: 'AF Manager（アプリ/ブラウザ）が見つかりません。\nTauriアプリを起動するか、同ブラウザでAF Managerを開いてください。' });
             })();
             return true;
         }

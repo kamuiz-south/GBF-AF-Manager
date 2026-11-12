@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AF Collector 接続設定</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: "Segoe UI", "Yu Gothic UI", system-ui, sans-serif;
+    }
+    body {
+      margin: 0;
+      padding: 24px;
+      background: #111827;
+      color: #e5e7eb;
+      min-width: 420px;
+    }
+    h1 {
+      font-size: 18px;
+      margin: 0 0 8px;
+    }
+    .lead, .hint {
+      color: #9ca3af;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+    .lead {
+      margin: 0 0 20px;
+    }
+    .field {
+      display: block;
+      margin-bottom: 16px;
+      font-size: 13px;
+    }
+    .field > span {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+    select, input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 8px 10px;
+      border: 1px solid #374151;
+      border-radius: 6px;
+      background: #1f2937;
+      color: #f9fafb;
+      font-size: 13px;
+    }
+    input[type="number"] {
+      width: 140px;
+    }
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 20px;
+    }
+    button {
+      padding: 8px 18px;
+      border: 0;
+      border-radius: 6px;
+      background: #2563eb;
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #1d4ed8;
+    }
+    #status {
+      font-size: 12px;
+      color: #34d399;
+    }
+    .hint {
+      margin: 6px 0 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>AF Collector 接続設定 / Connection</h1>
+  <p class="lead">
+    GBF AF Manager へのデータ送信方法を設定します。<br>
+    Configure how AF Collector connects to GBF AF Manager.
+  </p>
+
+  <label class="field">
+    <span>接続方法 / Connection mode</span>
+    <select id="mode">
+      <option value="auto">自動検出 / Auto detect</option>
+      <option value="fixed">固定ポート / Fixed port</option>
+    </select>
+    <p class="hint">
+      自動検出は 1422〜1432 を順に確認します。<br>
+      Auto detect checks ports 1422-1432.
+    </p>
+  </label>
+
+  <label class="field" id="fixedPortRow">
+    <span>固定ポート / Fixed port</span>
+    <input id="fixedPort" type="number" min="1024" max="65535" step="1">
+    <p class="hint">
+      Manager 側で 1422〜1432 以外のポートを指定した場合は、同じ番号をここに入力してください。<br>
+      If Manager uses a port outside 1422-1432, enter the same number here.
+    </p>
+  </label>
+
+  <div class="actions">
+    <button id="save" type="button">保存 / Save</button>
+    <span id="status" role="status"></span>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>

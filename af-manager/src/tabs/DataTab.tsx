@@ -2,20 +2,13 @@ import { useState, useCallback } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Upload, Database, CheckCircle2, AlertTriangle, FileJson, Trash2 } from 'lucide-react';
 import { db } from '../db';
-import { MAX_AF_INVENTORY } from '../constants';
 import { parseArtifactData } from '../utils/parser';
 import { evaluateArtifact } from '../utils/evaluator';
 import { saveKeepFlagSnapshot } from '../utils/upgradeLogger';
-import type { Settings } from '../types';
 import { useTranslation } from '../i18n';
 import { useAppStore } from '../store/useAppStore';
 import { useCollectorImport } from '../hooks/useGlobalDataReceiver';
-
-const DEFAULT_SETTINGS: Settings = {
-    id: 'global',
-    evaluationFormula: { group1Multiplier: 1, group2Multiplier: 1, group3Multiplier: 1, skillMultipliers: {}, qualityValues: {}, exceptions: [] },
-    discardBehavior: { treatUnnecessaryAsDiscard: true, targetInventoryCount: MAX_AF_INVENTORY, protectLocked: true, protectKeepFlag: true, protectRareAF: true, protectEquipped: true },
-};
+import { DEFAULT_SETTINGS } from '../data/defaultSettings';
 
 
 export default function DataTab() {

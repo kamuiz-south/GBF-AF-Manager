@@ -35,6 +35,8 @@ export interface AppArtifact extends ArtifactRaw {
   evaluationScore?: number; // pre-calculated score
   inventoryOrder?: number; // JSON array index from import to preserve exact fetch order
   discardFlag?: boolean; // App suggested discard flag (differs from is_unnecessary)
+  _page?: number; // AF Collector source page (1-based)
+  _pos?: number; // AF Collector index within the page (0-based)
 }
 
 export interface ArtifactMemo {
@@ -215,24 +217,25 @@ export interface Settings {
   discardBehavior: {
     treatUnnecessaryAsDiscard: boolean;
     targetInventoryCount: number;
-    protectLocked: boolean;
+    protectLocked: boolean;   // default false; missing values resolve to false
     protectKeepFlag: boolean;
     protectRareAF: boolean;  // protect rare AFs from discard flag
     protectEquipped: boolean; // protect equipped AFs from discard flag
-    protectMemos?: boolean;   // protect AFs that have a memo associated with them
-    protectLv5Skills?: boolean; // protect AFs that have any Lv5 skill
-    protectQuality5Skills?: boolean; // protect AFs that have any 5-star skill
-    protectQuality5Method?: 'all' | 'specific';
-    protectedQuality5SkillsList?: Array<{ conditionGroup: number; conditionSkillName: string | number }>;
-    protectedAttributes?: string[]; // e.g., ["fire", "water"]
+    protectMemos?: boolean;   // protect AFs that have a memo associated with them (default true)
+    protectLv5Skills?: boolean; // protect AFs that have any Lv5 skill (default true)
+    protectQuality5Skills?: boolean; // protect AFs that have any 5-star skill (default false)
+    protectQuality5Method?: 'all' | 'specific'; // default 'all'
+    protectedQuality5SkillsList?: Array<{ conditionGroup: number; conditionSkillName: string | number }>; // default []
+    protectedAttributes?: string[]; // e.g., ["fire", "water"] (default [])
   };
   design?: AppDesignSettings;   // UI design preferences
-  httpPort?: number;            // Tauri HTTP server port (default 1422)
-  language?: 'ja' | 'en';      // UI language (default 'ja')
-  pageLimit?: number;          // Stored user preference for list items per page
+  httpPort?: number;            // Preferred Tauri HTTP server port (default 1422)
+  httpPortAutoFallback?: boolean; // Try 1422-1432 when the preferred port is busy (default true)
+  language?: 'ja' | 'en';      // UI language (default defined in data/defaultSettings.ts)
+  pageLimit?: number;          // Stored user preference for list items per page (default defined in data/defaultSettings.ts)
   lastImportedAt?: string;     // ISO timestamp of the most recent AF data import
-  notificationDuration?: number;   // Toast display duration in seconds (default: 3)
-  notificationMaxCount?: number;   // Max simultaneous toasts (default: 1)
+  notificationDuration?: number;   // Toast display duration in seconds (default defined in data/defaultSettings.ts)
+  notificationMaxCount?: number;   // Max simultaneous toasts (default defined in data/defaultSettings.ts)
   saveWindowState?: boolean;       // Save and restore window size/position (default: true)
   windowState?: { width: number; height: number; x: number; y: number }; // Stored window geometry
   skillFilterFields?: number[][];  // Skill filter for ListTab: 3 fields of baseId arrays (OR between fields, AND within)
@@ -245,8 +248,9 @@ export interface Settings {
   autoFlagUpdate?: {
     keepFlag: boolean;
     discardFlag: boolean;
-  };
-  upgradeLogMaxCount?: number; // max upgrade logs to retain (default 20)
+  }; // defaults defined in data/defaultSettings.ts
+  upgradeLogMaxCount?: number; // max upgrade logs to retain (default defined in data/defaultSettings.ts)
+  upgradeLogShowAllArtifacts?: boolean; // show AFs kept both before and after in upgrade history (default false)
 }
 
 // ─── Upgrade Log Types ────────────────────────────────────────────
@@ -260,6 +264,8 @@ export interface UpgradeLogEntry {
   newArtifacts: AppArtifact[];
   methodType?: 1 | 2;        // 方法1 or 方法2
   characterName?: string;    // 方法2の場合のキャラ名（グルーピングキーとして使用）
+  targetCount?: number;      // このグループの目標確保数（ログ生成時点）
+  newKeptCount?: number;     // 更新後の確保数（共通AFを含む）
 }
 
 export interface UpgradeLog {

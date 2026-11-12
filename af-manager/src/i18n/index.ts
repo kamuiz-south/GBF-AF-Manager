@@ -1,4 +1,5 @@
 import { useAppStore } from '../store/useAppStore';
+import { DEFAULT_LANGUAGE } from '../data/defaultSettings';
 import { en } from './en';
 import { ja } from './ja';
 
@@ -12,7 +13,7 @@ export type TranslationKey = keyof typeof ja;
 export function useTranslation() {
     // We assume useAppStore provides a way to get the language. If missing, we fallback to 'ja'
     // This requires SettingsTab or App to write settings.language to the store or DB.
-    const getLanguage = useAppStore(state => (state as any).globalSettings?.language ?? 'ja');
+    const getLanguage = useAppStore(state => (state as any).globalSettings?.language ?? DEFAULT_LANGUAGE);
     const language = getLanguage as 'en' | 'ja';
     const dictionary = dictionaries[language] || dictionaries.ja;
 

@@ -1,10 +1,21 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke, isTauri } from '@tauri-apps/api/core';
 import { Download, Upload, Trash2, Plus, Minus, RefreshCw, Palette, Zap, Save, Settings as SettingsIcon, ShieldAlert, MonitorUp, HardDrive, ArrowRight, Calculator, Sun, Moon, GripVertical, Copy, ChevronRight, ChevronDown, FolderPlus, AlertTriangle, Folder, Edit2, RotateCcw, Bell, CheckCircle2, Wand2 } from 'lucide-react';
 
 import { db } from '../db';
 import type { Settings } from '../types';
 import { DEFAULT_DESIGN } from '../types';
+import {
+    DEFAULT_SETTINGS,
+    DEFAULT_NOTIFICATION_MAX_COUNT,
+    DEFAULT_NOTIFICATION_DURATION,
+    DEFAULT_PAGE_LIMIT,
+    DEFAULT_LANGUAGE,
+    DEFAULT_AUTO_FLAG_UPDATE,
+    DEFAULT_HTTP_PORT,
+    DEFAULT_HTTP_PORT_AUTO_FALLBACK,
+    resolveDiscardBehavior,
+} from '../data/defaultSettings';
 import { exportDatabase, importDatabase, exportMemos, importMemos, exportConditions, importConditions } from '../utils/backup';
 import { G1_SKILLS, G2_SKILLS, G3_SKILLS } from '../data/skillMaster';
 import { evaluateArtifact } from '../utils/evaluator';
@@ -14,43 +25,15 @@ import { alertUnnecessaryKeeps } from '../utils/alertUnnecessaryKeeps';
 import { useAppStore } from '../store/useAppStore';
 import { useTranslation, type TranslationKey } from '../i18n';
 import { translateSkill, truncateSkill } from '../utils/skillMapping';
+import FontSelect from '../components/FontSelect';
 
-const FONT_OPTIONS = [
-    { label: 'System Default', value: "'Inter', 'Segoe UI', system-ui, sans-serif" },
-    { label: 'Arial', value: "Arial, sans-serif" },
-    { label: 'Meiryo', value: "'Meiryo', sans-serif" },
-    { label: 'メイリオ', value: "'メイリオ', 'Meiryo', sans-serif" },
-    { label: 'MS PGothic', value: "'MS PGothic', sans-serif" },
-    { label: 'ＭＳ Ｐゴシック', value: "'ＭＳ Ｐゴシック', 'MS PGothic', sans-serif" },
-    { label: 'Yu Gothic', value: "'Yu Gothic', 'YuGothic', sans-serif" },
-    { label: '游ゴシック', value: "'游ゴシック', 'Yu Gothic', sans-serif" },
-    { label: 'BIZ UDGothic', value: "'BIZ UDGothic', sans-serif" },
-    { label: 'Noto Sans JP', value: "'Noto Sans JP', sans-serif" },
-    { label: 'Monospace', value: "monospace" },
-    { label: 'Serif (Mincho)', value: "'Yu Mincho', 'MS PMincho', serif" }
-];
-
-export const DEFAULT_SETTINGS: Settings = {
-    id: 'global',
-    language: 'ja',
-    evaluationFormula: {
-        group1Multiplier: 1,
-        group2Multiplier: 1,
-        group3Multiplier: 1,
-        skillMultipliers: {},
-        qualityValues: { 1: 1, 2: 1, 3: 1, 4: 1, 5: 1 },
-        exceptions: []
-    },
-    discardBehavior: {
-        treatUnnecessaryAsDiscard: true,
-        targetInventoryCount: 1000,
-        protectLocked: false,
-        protectKeepFlag: true,
-        protectRareAF: true,
-        protectEquipped: true,
-    },
-    pageLimit: 10,
-    saveWindowState: true
+type HttpServerInfo = {
+    running: boolean;
+    port: number;
+    mode: string;
+    preferredPort: number;
+    instanceId: string;
+    error?: string | null;
 };
 
 export default function SettingsTab() {
@@ -70,6 +53,7 @@ export default function SettingsTab() {
     const fontMainRef = useRef<HTMLDivElement>(null);
     const fontSubRef = useRef<HTMLDivElement>(null);
     const [confirmDeleteExIdx, setConfirmDeleteExIdx] = useState<number | null>(null);
+    const [httpServerInfo, setHttpServerInfo] = useState<HttpServerInfo | null>(null);
     const setSettingsDirty = useAppStore(state => state.setSettingsDirty);
     const showToast = useAppStore(state => state.showToast);
 
@@ -82,9 +66,25 @@ export default function SettingsTab() {
     const updateDiscardSettings = useCallback((patch: Partial<Settings['discardBehavior']>) => {
         setSettings(prev => ({
             ...prev,
-            discardBehavior: { ...prev.discardBehavior, ...patch }
+            discardBehavior: { ...resolveDiscardBehavior(prev.discardBehavior), ...patch }
         }));
         setHasDiscardChanges(true);
+    }, []);
+
+    const discard = resolveDiscardBehavior(settings.discardBehavior);
+
+    const persistPortConfig = useCallback((target: Settings) => {
+        if (!isTauri()) return Promise.resolve();
+        const mode = (target.httpPortAutoFallback ?? DEFAULT_HTTP_PORT_AUTO_FALLBACK) ? 'auto' : 'fixed';
+        const preferredPort = Math.max(1024, Math.min(65535, target.httpPort ?? DEFAULT_HTTP_PORT));
+        return invoke('set_http_port_config', { mode, preferredPort }).catch(console.error);
+    }, []);
+
+    useEffect(() => {
+        if (!isTauri()) return;
+        invoke<HttpServerInfo>('get_http_server_info')
+            .then(setHttpServerInfo)
+            .catch(console.error);
     }, []);
 
     // click-outside detection for font dropdowns
@@ -114,7 +114,7 @@ export default function SettingsTab() {
                 if (res.evaluationFormula && Array.isArray(res.evaluationFormula.exceptions)) {
                     const normalizeExceptions = (exs: any[]): any[] => {
                         return exs.map(ex => {
-                            let newEx = { ...ex };
+                            const newEx = { ...ex };
                             if (!newEx.id) {
                                 newEx.id = Math.random().toString(36).substr(2, 9);
                                 modified = true;
@@ -146,10 +146,12 @@ export default function SettingsTab() {
                 setSettings(finalSettings);
                 setLocalFontMain(finalSettings.design?.fontFamilyMain ?? "'Inter', 'Segoe UI', system-ui, sans-serif");
                 setLocalFontSub(finalSettings.design?.fontFamilySub ?? "'Inter', 'Segoe UI', system-ui, sans-serif");
+                // 既存設定からバックエンドの network-config.json を初期化・同期
+                persistPortConfig(finalSettings);
             }
             setLoading(false);
         });
-    }, []);
+    }, [persistPortConfig]);
 
     const loadSystemFonts = async () => {
         if (!('queryLocalFonts' in window)) {
@@ -206,12 +208,32 @@ export default function SettingsTab() {
     };
 
     const handleSave = async () => {
-        await db.settings.put(settings);
+        const normalizedPort = Math.max(1024, Math.min(65535, settings.httpPort ?? DEFAULT_HTTP_PORT));
+        const normalizedSettings = normalizedPort === settings.httpPort
+            ? settings
+            : { ...settings, httpPort: normalizedPort };
+        // タブ別ズームは App 側で随時更新される。設定タブが古い design を
+        // 保持していても、保存時に現在値を消さないように最新値を引き継ぐ。
+        const latest = await db.settings.get('global');
+        const latestTabZoom = latest?.design?.tabZoom;
+        const settingsToSave: Settings = {
+            ...normalizedSettings,
+            // 更新履歴側で変更される設定は、このタブの古いローカル状態で
+            // 上書きしないよう最新値を引き継ぐ。
+            upgradeLogShowAllArtifacts: latest?.upgradeLogShowAllArtifacts ?? normalizedSettings.upgradeLogShowAllArtifacts,
+            upgradeLogMaxCount: latest?.upgradeLogMaxCount ?? normalizedSettings.upgradeLogMaxCount,
+            ...(latestTabZoom === undefined
+                ? {}
+                : { design: { ...DEFAULT_DESIGN, ...(normalizedSettings.design ?? {}), tabZoom: latestTabZoom } }),
+        };
+        await db.settings.put(settingsToSave);
+        await persistPortConfig(settingsToSave);
+        setSettings(settingsToSave);
         setIsDirty(false);
         setSettingsDirty(false);
         try {
             const artifacts = await db.artifacts.toArray();
-            artifacts.forEach(a => { a.evaluationScore = evaluateArtifact(a, settings); });
+            artifacts.forEach(a => { a.evaluationScore = evaluateArtifact(a, normalizedSettings); });
             await db.artifacts.bulkPut(artifacts);
             showToast(language === 'en' ? 'Settings saved and artifact scores recalculated.\nRecalculation of keep flags is recommended.' : '設定を保存し、評価値を再計算しました。\n確保フラグの再計算を推奨します。', 'success');
         } catch (e) {
@@ -409,18 +431,28 @@ export default function SettingsTab() {
     const currentDesign = { ...DEFAULT_DESIGN, ...(settings.design ?? {}) };
     const updateDesign = (patch: Partial<typeof DEFAULT_DESIGN>, persist: boolean = true) => {
         const newDesign = { ...currentDesign, ...patch };
-        const newSettings = { ...settings, design: newDesign };
-        setSettings(newSettings); // Update React state first
+        setSettings(prev => ({ ...prev, design: newDesign })); // Update React state first
         if (persist) {
-            // Always read from DB to avoid overwriting fields managed elsewhere (e.g. skillFilterFields)
+            // Always read from DB to avoid overwriting fields managed elsewhere
+            // (e.g. tabZoom updated from App, skillFilterFields).
             db.settings.get('global').then(latest => {
                 const base = latest ?? settings;
-                db.settings.put({ ...base, design: newDesign }).catch(console.error);
+                const persistedDesign = { ...DEFAULT_DESIGN, ...(base.design ?? {}), ...patch };
+                db.settings.put({ ...base, design: persistedDesign }).catch(console.error);
+                // ローカルの未保存デザイン変更を保ったまま、外部更新される
+                // tabZoom だけを最新値に同期する。
+                setSettings(prev => ({
+                    ...prev,
+                    design: {
+                        ...(prev.design ?? DEFAULT_DESIGN),
+                        tabZoom: persistedDesign.tabZoom,
+                    },
+                }));
             });
         }
     };
     const updateAutoFlag = (patch: Partial<NonNullable<Settings['autoFlagUpdate']>>) => {
-        const newVal = { keepFlag: false, discardFlag: false, ...(settings.autoFlagUpdate ?? {}), ...patch };
+        const newVal = { ...DEFAULT_AUTO_FLAG_UPDATE, ...(settings.autoFlagUpdate ?? {}), ...patch };
         setSettings(prev => ({ ...prev, autoFlagUpdate: newVal }));
         db.settings.get('global').then(latest => {
             const base = latest ?? settings;
@@ -428,11 +460,11 @@ export default function SettingsTab() {
         });
     };
     const resetDesign = () => {
-        const newSettings = { ...settings, design: { ...DEFAULT_DESIGN }, pageLimit: 10 };
+        const newSettings = { ...settings, design: { ...DEFAULT_DESIGN }, pageLimit: DEFAULT_PAGE_LIMIT };
         setSettings(newSettings);
         db.settings.get('global').then(latest => {
             const base = latest ?? settings;
-            db.settings.put({ ...base, design: { ...DEFAULT_DESIGN }, pageLimit: 10 }).catch(console.error);
+            db.settings.put({ ...base, design: { ...DEFAULT_DESIGN }, pageLimit: DEFAULT_PAGE_LIMIT }).catch(console.error);
         });
     };
 
@@ -477,7 +509,7 @@ export default function SettingsTab() {
                     <select
                         className="input"
                         style={{ padding: '0.3rem 0.6rem', fontSize: 'var(--font-size-main)', cursor: 'pointer' }}
-                        value={settings.language || 'ja'}
+                        value={settings.language || DEFAULT_LANGUAGE}
                         onChange={async (e) => {
                             const newLang = e.target.value as 'en' | 'ja';
 
@@ -519,7 +551,7 @@ export default function SettingsTab() {
                         {language === 'en' ? '【 Final Overall AF Evaluation Score 】' : '【 最終的なAFの全体評価スコア 】'}
                     </div>
                     <div style={{ paddingLeft: '1.2rem', color: 'var(--text-main)', fontWeight: 400 }}>
-                        <div>　( {language === 'en' ? 'Group Ⅰ Coefficient' : 'グループⅠ係数'} × [ {language === 'en' ? 'Skill 1' : 'スキル1'}{language === 'en' ? ' Value' : '評価値'} + {language === 'en' ? 'Skill 2' : 'スキル2'}{language === 'en' ? ' Value' : '評価値'} ] )</div>
+                        <div>{'　'}( {language === 'en' ? 'Group Ⅰ Coefficient' : 'グループⅠ係数'} × [ {language === 'en' ? 'Skill 1' : 'スキル1'}{language === 'en' ? ' Value' : '評価値'} + {language === 'en' ? 'Skill 2' : 'スキル2'}{language === 'en' ? ' Value' : '評価値'} ] )</div>
                         <div>+ ( {language === 'en' ? 'Group Ⅱ Coefficient' : 'グループⅡ係数'} × [ {language === 'en' ? 'Skill 3' : 'スキル3'}{language === 'en' ? ' Value' : '評価値'} ] )</div>
                         <div>+ ( {language === 'en' ? 'Group Ⅲ Coefficient' : 'グループⅢ係数'} × [ {language === 'en' ? 'Skill 4' : 'スキル4'}{language === 'en' ? ' Value' : '評価値'} ] )</div>
                         <div>+ ( {language === 'en' ? 'Skill Combination Correction' : 'スキル組み合わせ補正'} )</div>
@@ -1275,7 +1307,7 @@ export default function SettingsTab() {
                         type="number"
                         className="input"
                         style={{ maxWidth: '200px' }}
-                        value={settings.discardBehavior.targetInventoryCount}
+                        value={discard.targetInventoryCount}
                         onChange={e => updateDiscardSettings({ targetInventoryCount: parseInt(e.target.value) || MAX_AF_INVENTORY })}
                     />
                 </div>
@@ -1283,49 +1315,49 @@ export default function SettingsTab() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', marginBottom: '1.5rem' }}>
                     <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.8rem', cursor: 'pointer', fontSize: 'var(--font-size-main)' }}>
                         <input type="checkbox" style={{ marginTop: '3px' }}
-                            checked={settings.discardBehavior.protectLocked ?? true}
+                            checked={discard.protectLocked}
                             onChange={e => updateDiscardSettings({ protectLocked: e.target.checked })}
                         />
                         <span><strong>{language === 'en' ? 'Protect Favorites (Locked)' : 'お気に入りを保護'}</strong><br /><span style={{ fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)' }}>{language === 'en' ? 'If OFF, favorite AFs can be flagged. A "Discard?" warning badge will appear.' : 'OFFにするとお気に入りのAFも廃棄候補になります。「廃棄？」バッジで警告します。'}</span></span>
                     </label>
                     <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.8rem', cursor: 'pointer', fontSize: 'var(--font-size-main)' }}>
                         <input type="checkbox" style={{ marginTop: '3px' }}
-                            checked={settings.discardBehavior.protectKeepFlag ?? true}
+                            checked={discard.protectKeepFlag}
                             onChange={e => updateDiscardSettings({ protectKeepFlag: e.target.checked })}
                         />
                         <span><strong>{language === 'en' ? 'Protect Target Criteria AFs' : '確保されたAFを保護'}</strong><br /><span style={{ fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)' }}>{language === 'en' ? 'Excludes AFs caught by "Criteria" from discard selection.' : '「欲しい条件」で確保フラグが立ったAFを廃棄候補から除外します。'}</span></span>
                     </label>
                     <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.8rem', cursor: 'pointer', fontSize: 'var(--font-size-main)' }}>
                         <input type="checkbox" style={{ marginTop: '3px' }}
-                            checked={settings.discardBehavior.treatUnnecessaryAsDiscard}
+                            checked={discard.treatUnnecessaryAsDiscard}
                             onChange={e => updateDiscardSettings({ treatUnnecessaryAsDiscard: e.target.checked })}
                         />
                         <span><strong>{language === 'en' ? 'Include "Packaged" in Discard Quota' : '不用品を廃棄予定に含める'}</strong><br /><span style={{ fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)' }}>{language === 'en' ? 'If ON, packaged (trash) AFs count toward your discard goal and evaluate first.' : 'ONの場合、ゲーム内不用品マークのAFは先に廃棄提案になったり、その分廃棄必要数が減ります。'}</span></span>
                     </label>
                     <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.8rem', cursor: 'pointer', fontSize: 'var(--font-size-main)' }}>
                         <input type="checkbox" style={{ marginTop: '3px' }}
-                            checked={settings.discardBehavior.protectRareAF ?? true}
+                            checked={discard.protectRareAF}
                             onChange={e => updateDiscardSettings({ protectRareAF: e.target.checked })}
                         />
                         <span><strong>{language === 'en' ? 'Protect Quirk Artifacts' : 'クァーキー・アーティファクトを保護'}</strong><br /><span style={{ fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)' }}>{language === 'en' ? 'Excludes specific quirk artifacts like Fantosmik Fengtooth from discard.' : '幻麗の犀牙など、ドロップ率が低い希少なクァーキーAFを廃棄候補から除外します。'}</span></span>
                     </label>
                     <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.8rem', cursor: 'pointer', fontSize: 'var(--font-size-main)' }}>
                         <input type="checkbox" style={{ marginTop: '3px' }}
-                            checked={settings.discardBehavior.protectEquipped ?? true}
+                            checked={discard.protectEquipped}
                             onChange={e => updateDiscardSettings({ protectEquipped: e.target.checked })}
                         />
                         <span><strong>{language === 'en' ? 'Protect Equipped AFs' : '装備中のAFを保護'}</strong><br /><span style={{ fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)' }}>{language === 'en' ? 'Excludes AFs currently equipped by characters.' : 'キャラに装備中のAFを廃棄候補から除外します。'}</span></span>
                     </label>
                     <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.8rem', cursor: 'pointer', fontSize: 'var(--font-size-main)' }}>
                         <input type="checkbox" style={{ marginTop: '3px' }}
-                            checked={settings.discardBehavior.protectMemos ?? true}
+                            checked={discard.protectMemos}
                             onChange={e => updateDiscardSettings({ protectMemos: e.target.checked })}
                         />
                         <span><strong>{language === 'en' ? 'Protect AFs with Memos' : 'メモ付きのAFを保護'}</strong><br /><span style={{ fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)' }}>{language === 'en' ? 'Excludes AFs that have any memo text attached.' : 'メモ欄にテキストが入力されているAFを廃棄候補から除外します。'}</span></span>
                     </label>
                     <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.8rem', cursor: 'pointer', fontSize: 'var(--font-size-main)' }}>
                         <input type="checkbox" style={{ marginTop: '3px' }}
-                            checked={settings.discardBehavior.protectLv5Skills ?? true}
+                            checked={discard.protectLv5Skills}
                             onChange={e => updateDiscardSettings({ protectLv5Skills: e.target.checked })}
                         />
                         <span><strong>{language === 'en' ? 'Protect AFs with Lv5 Skills' : 'Lv5スキル持ちのAFを保護'}</strong><br /><span style={{ fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)' }}>{language === 'en' ? 'Excludes AFs that have at least one level 5 skill.' : 'いずれかのスキルがLv5まで強化されているAFを廃棄候補から除外します。'}</span></span>
@@ -1334,32 +1366,32 @@ export default function SettingsTab() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                         <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.8rem', cursor: 'pointer', fontSize: 'var(--font-size-main)' }}>
                             <input type="checkbox" style={{ marginTop: '3px' }}
-                                checked={settings.discardBehavior.protectQuality5Skills ?? false}
+                                checked={discard.protectQuality5Skills}
                                 onChange={e => updateDiscardSettings({ protectQuality5Skills: e.target.checked })}
                             />
                             <span><strong>{language === 'en' ? 'Protect AFs with ☆5 Skills' : '☆5スキル持ちのAFを保護'}</strong><br /><span style={{ fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)' }}>{language === 'en' ? 'Excludes AFs that have at least one skill with a maximum initial value (☆5).' : 'いずれかのスキルの初期値が最高値（☆5）のAFを廃棄候補から除外します。'}</span></span>
                         </label>
 
-                        {settings.discardBehavior.protectQuality5Skills && (
+                        {discard.protectQuality5Skills && (
                             <div className="settings-group-box" style={{ marginLeft: '1.8rem', display: 'flex', flexDirection: 'column', gap: '0.8rem', padding: '0.8rem 1rem' }}>
                                 <div style={{ display: 'flex', gap: '1.5rem' }}>
                                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
                                         <input type="radio" 
-                                            checked={(settings.discardBehavior.protectQuality5Method ?? 'all') === 'all'}
+                                            checked={discard.protectQuality5Method === 'all'}
                                             onChange={() => updateDiscardSettings({ protectQuality5Method: 'all' })}
                                         />
                                         <span>{language === 'en' ? 'All Skills' : 'すべてのスキル'}</span>
                                     </label>
                                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
                                         <input type="radio" 
-                                            checked={settings.discardBehavior.protectQuality5Method === 'specific'}
+                                            checked={discard.protectQuality5Method === 'specific'}
                                             onChange={() => updateDiscardSettings({ protectQuality5Method: 'specific' })}
                                         />
                                         <span>{language === 'en' ? 'Specific Skills Only' : '特定のスキルのみ'}</span>
                                     </label>
                                 </div>
 
-                                {settings.discardBehavior.protectQuality5Method === 'specific' && (
+                                {discard.protectQuality5Method === 'specific' && (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
                                         <div className="settings-inner-list-box" style={{ 
                                             padding: '0.6rem', 
@@ -1371,9 +1403,9 @@ export default function SettingsTab() {
                                             flexDirection: 'column'
                                         }}>
                                             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem', overflowY: 'auto', padding: '2px' }}>
-                                                {(settings.discardBehavior.protectedQuality5SkillsList || []).map((item, idx) => {
+                                                {discard.protectedQuality5SkillsList.map((item, idx) => {
                                                     const updateItem = (newBaseId: number) => {
-                                                        const newList = [...(settings.discardBehavior.protectedQuality5SkillsList || [])];
+                                                        const newList = [...discard.protectedQuality5SkillsList];
                                                         let newGroup = 1;
                                                         const found = [...G1_SKILLS, ...G2_SKILLS, ...G3_SKILLS].find(s => s.baseId === newBaseId);
                                                         if (found) {
@@ -1386,7 +1418,7 @@ export default function SettingsTab() {
                                                     };
 
                                                     const removeItem = () => {
-                                                        const newList = settings.discardBehavior.protectedQuality5SkillsList!.filter((_, i) => i !== idx);
+                                                        const newList = discard.protectedQuality5SkillsList.filter((_, i) => i !== idx);
                                                         updateDiscardSettings({ protectedQuality5SkillsList: newList });
                                                     };
 
@@ -1420,7 +1452,7 @@ export default function SettingsTab() {
                                             color: currentDesign.theme === 'dark' ? '#fff' : undefined
                                         }}
                                             onClick={() => {
-                                                const newList = [...(settings.discardBehavior.protectedQuality5SkillsList || [])];
+                                                const newList = [...discard.protectedQuality5SkillsList];
                                                 newList.push({ conditionGroup: 1, conditionSkillName: '' });
                                                 updateDiscardSettings({ protectedQuality5SkillsList: newList });
                                             }}
@@ -1450,13 +1482,13 @@ export default function SettingsTab() {
                             { val: '5', label: '光', color: '#fef08a' },
                             { val: '6', label: '闇', color: '#c084fc' }
                         ].map(attr => {
-                            const isChecked = settings.discardBehavior.protectedAttributes?.includes(attr.val) ?? false;
+                            const isChecked = discard.protectedAttributes.includes(attr.val);
                             return (
                                 <label key={attr.val} className="settings-attr-chip" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', padding: '0.3rem 0.6rem', border: `1px solid ${isChecked ? attr.color : 'transparent'}` }}>
                                     <input type="checkbox"
                                         checked={isChecked}
                                         onChange={e => {
-                                            const set = new Set(settings.discardBehavior.protectedAttributes ?? []);
+                                            const set = new Set(discard.protectedAttributes);
                                             if (e.target.checked) set.add(attr.val);
                                             else set.delete(attr.val);
                                             updateDiscardSettings({ protectedAttributes: Array.from(set) });
@@ -1583,107 +1615,38 @@ export default function SettingsTab() {
 
                 {/* Font Family Selection + Preview (side by side) */}
                 {(() => {
-                    const allFontOpts = [
-                        ...FONT_OPTIONS,
-                        ...localFonts.map(f => ({ label: f, value: f })),
-                    ];
                     const previewMainFont = previewFontMain || localFontMain;
                     const previewSubFont = previewFontSub || localFontSub;
-                    const customDropdown = ({
-                        label, value, isOpen, setIsOpen, onHover, onSelect, onLeave, ref
-                    }: {
-                        label: string; value: string; isOpen: boolean;
-                        setIsOpen: (v: boolean) => void;
-                        onHover: (v: string) => void;
-                        onSelect: (v: string) => void;
-                        onLeave: () => void;
-                        ref?: React.RefObject<HTMLDivElement | null>;
-                    }) => {
-                        const selectedLabel = allFontOpts.find(o => o.value === value)?.label ?? value;
-                        const dropdownBg = currentDesign.theme === 'dark' ? '#1e293b' : '#ffffff';
-                        const dropdownHover = currentDesign.theme === 'dark' ? '#334155' : '#f1f5f9';
-                        return (
-                            <div ref={ref}>
-                                <label style={{ display: 'block', fontSize: 'var(--font-size-main)', marginBottom: '0.4rem', fontWeight: 600 }}>
-                                    {label}
-                                </label>
-                                <div style={{ position: 'relative' }}>
-                                    <button
-                                        type="button"
-                                        className="input"
-                                        style={{ width: '100%', padding: '0.4rem 0.6rem', fontSize: 'var(--font-size-main)', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
-                                        onClick={() => setIsOpen(!isOpen)}
-                                    >
-                                        <span style={{ fontFamily: value }}>{selectedLabel}</span>
-                                        <ChevronDown size={14} style={{ flexShrink: 0 }} />
-                                    </button>
-                                    {isOpen && (
-                                        <div
-                                            style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 300, maxHeight: '220px', overflowY: 'auto', background: dropdownBg, border: '1px solid var(--accent-blue)', borderRadius: '6px', boxShadow: '0 6px 20px rgba(0,0,0,0.5)' }}
-                                            onMouseLeave={onLeave}
-                                        >
-                                            {FONT_OPTIONS.length > 0 && (
-                                                <div>
-                                                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', padding: '5px 10px 2px', letterSpacing: '0.06em', background: dropdownBg }}>{language === 'en' ? 'BUILT-IN' : 'プリセット'}</div>
-                                                    {FONT_OPTIONS.map(opt => (
-                                                        <div
-                                                            key={opt.value}
-                                                            style={{ padding: '7px 12px', cursor: 'pointer', fontFamily: opt.value, background: value === opt.value ? 'var(--accent-blue)' : dropdownBg, color: value === opt.value ? '#fff' : 'var(--text-main)' }}
-                                                            onMouseEnter={e => { onHover(opt.value); (e.currentTarget as HTMLElement).style.background = value === opt.value ? 'var(--accent-blue)' : dropdownHover; }}
-                                                            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = value === opt.value ? 'var(--accent-blue)' : dropdownBg; }}
-                                                            onClick={() => { onSelect(opt.value); setIsOpen(false); onLeave(); }}
-                                                        >
-                                                            {opt.label}
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-                                            {localFonts.length > 0 && (
-                                                <div style={{ borderTop: '1px solid var(--dim-border)' }}>
-                                                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', padding: '5px 10px 2px', letterSpacing: '0.06em', background: dropdownBg }}>{language === 'en' ? 'SYSTEM' : 'システムフォント'}</div>
-                                                    {localFonts.map(f => (
-                                                        <div
-                                                            key={f}
-                                                            style={{ padding: '7px 12px', cursor: 'pointer', fontFamily: f, background: value === f ? 'var(--accent-blue)' : dropdownBg, color: value === f ? '#fff' : 'var(--text-main)' }}
-                                                            onMouseEnter={e => { onHover(f); (e.currentTarget as HTMLElement).style.background = value === f ? 'var(--accent-blue)' : dropdownHover; }}
-                                                            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = value === f ? 'var(--accent-blue)' : dropdownBg; }}
-                                                            onClick={() => { onSelect(f); setIsOpen(false); onLeave(); }}
-                                                        >
-                                                            {f}
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        );
-                    };
                     return (
                         <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '1.5rem', alignItems: 'flex-start' }}>
                             {/* Left: dropdowns */}
                             <div style={{ flex: '1 1 50%', minWidth: '220px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                {customDropdown({
-                                    label: language === 'en' ? 'Main Text Font' : '本文フォント',
-                                    value: localFontMain,
-                                    isOpen: fontMainOpen,
-                                    setIsOpen: (v) => { setFontMainOpen(v); if (v) setFontSubOpen(false); },
-                                    onHover: setPreviewFontMain,
-                                    onSelect: setLocalFontMain,
-                                    onLeave: () => setPreviewFontMain(''),
-                                    ref: fontMainRef,
-                                })}
-                                {customDropdown({
-                                    label: language === 'en' ? 'Secondary Text Font' : '補助テキストフォント',
-                                    value: localFontSub,
-                                    isOpen: fontSubOpen,
-                                    setIsOpen: (v) => { setFontSubOpen(v); if (v) setFontMainOpen(false); },
-                                    onHover: setPreviewFontSub,
-                                    onSelect: setLocalFontSub,
-                                    onLeave: () => setPreviewFontSub(''),
-                                    ref: fontSubRef,
-                                })}
+                                <FontSelect
+                                    label={language === 'en' ? 'Main Text Font' : '本文フォント'}
+                                    value={localFontMain}
+                                    isOpen={fontMainOpen}
+                                    onOpenChange={(v) => { setFontMainOpen(v); if (v) setFontSubOpen(false); }}
+                                    onHover={setPreviewFontMain}
+                                    onSelect={setLocalFontMain}
+                                    onLeave={() => setPreviewFontMain('')}
+                                    systemFonts={localFonts}
+                                    theme={currentDesign.theme}
+                                    language={language}
+                                    containerRef={fontMainRef}
+                                />
+                                <FontSelect
+                                    label={language === 'en' ? 'Secondary Text Font' : '補助テキストフォント'}
+                                    value={localFontSub}
+                                    isOpen={fontSubOpen}
+                                    onOpenChange={(v) => { setFontSubOpen(v); if (v) setFontMainOpen(false); }}
+                                    onHover={setPreviewFontSub}
+                                    onSelect={setLocalFontSub}
+                                    onLeave={() => setPreviewFontSub('')}
+                                    systemFonts={localFonts}
+                                    theme={currentDesign.theme}
+                                    language={language}
+                                    containerRef={fontSubRef}
+                                />
                                 <button className="btn btn-primary" onClick={() => { updateDesign({ fontFamilyMain: localFontMain, fontFamilySub: localFontSub }); setFontMainOpen(false); setFontSubOpen(false); }} style={{ padding: '0.5rem 1rem', marginTop: '0.2rem' }}>
                                     <CheckCircle2 size={16} style={{ marginRight: '0.4rem' }} /> {language === 'en' ? 'Apply Fonts' : 'フォントを適用'}
                                 </button>
@@ -2017,9 +1980,9 @@ export default function SettingsTab() {
                             min={1}
                             max={60}
                             style={{ width: '80px', padding: '0.3rem 0.5rem', flexShrink: 0 }}
-                            value={settings.notificationDuration ?? 3}
+                            value={settings.notificationDuration ?? DEFAULT_NOTIFICATION_DURATION}
                             onChange={async e => {
-                                const val = Math.max(1, Math.min(60, parseInt(e.target.value) || 3));
+                                const val = Math.max(1, Math.min(60, parseInt(e.target.value) || DEFAULT_NOTIFICATION_DURATION));
                                 const newSettings = { ...settings, notificationDuration: val };
                                 setSettings(newSettings);
                                 const latest = await db.settings.get('global');
@@ -2043,9 +2006,9 @@ export default function SettingsTab() {
                             min={1}
                             max={10}
                             style={{ width: '80px', padding: '0.3rem 0.5rem', flexShrink: 0 }}
-                            value={settings.notificationMaxCount ?? 1}
+                            value={settings.notificationMaxCount ?? DEFAULT_NOTIFICATION_MAX_COUNT}
                             onChange={async e => {
-                                const val = Math.max(1, Math.min(10, parseInt(e.target.value) || 1));
+                                const val = Math.max(1, Math.min(10, parseInt(e.target.value) || DEFAULT_NOTIFICATION_MAX_COUNT));
                                 const newSettings = { ...settings, notificationMaxCount: val };
                                 setSettings(newSettings);
                                 const latest = await db.settings.get('global');
@@ -2122,20 +2085,80 @@ export default function SettingsTab() {
                     <input type="number" className="input"
                         style={{ width: '100px' }}
                         min={1024} max={65535}
-                        value={settings.httpPort ?? 1422}
-                        onChange={e => updateSettings({ ...settings, httpPort: parseInt(e.target.value) || 1422 })}
+                        value={settings.httpPort ?? DEFAULT_HTTP_PORT}
+                        onChange={e => updateSettings({
+                            ...settings,
+                            httpPort: parseInt(e.target.value) || DEFAULT_HTTP_PORT
+                        })}
+                        onBlur={() => updateSettings({
+                            ...settings,
+                            httpPort: Math.max(1024, Math.min(65535, settings.httpPort ?? DEFAULT_HTTP_PORT))
+                        })}
                     />
                     <span style={{ fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)' }}>{language === 'en' ? '(Default: 1422)' : '（デフォルト: 1422）'}</span>
                 </div>
-                <p style={{ fontSize: 'var(--font-size-sub)', color: '#f59e0b', marginBottom: '0.6rem' }}>
-                    {language === 'en' ? '⚠ Restart the Desktop Application after saving to apply port changes.' : '⚠ 変更を反映するにはアプリ設定を保存後、デスクトップアプリ版を再起動してください。'}
+
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.7rem', cursor: 'pointer', fontSize: 'var(--font-size-main)', fontWeight: 600, marginBottom: '0.6rem' }}>
+                    <input type="checkbox" style={{ marginTop: '4px' }}
+                        checked={settings.httpPortAutoFallback ?? DEFAULT_HTTP_PORT_AUTO_FALLBACK}
+                        onChange={e => updateSettings({ ...settings, httpPortAutoFallback: e.target.checked })} />
+                    <span>
+                        {language === 'en' ? 'Automatically use another port if the preferred port is busy' : '優先ポートが使用中なら、別のポートを自動で使用する'}
+                        <br />
+                        <span style={{ fontSize: 'calc(var(--font-size-sub) * 0.97)', color: 'var(--text-muted)', fontWeight: 400, display: 'inline-block', marginTop: '0.3rem', lineHeight: 1.5 }}>
+                            {language === 'en'
+                                ? 'Tries 1422-1432 after the preferred port. AF Collector detects the actual listening port automatically.'
+                                : '優先ポートの次に1422〜1432を試します。AF Collectorは実際に待ち受けているポートを自動検出します。'}
+                        </span>
+                    </span>
+                </label>
+
+                {httpServerInfo && (
+                    <p style={{ fontSize: 'var(--font-size-sub)', lineHeight: 1.5, marginBottom: '0.6rem', color: httpServerInfo.running ? 'var(--accent-blue)' : 'var(--accent-danger)' }}>
+                        {httpServerInfo.running ? (
+                            <>
+                                {language === 'en' ? 'Current listening port: ' : '現在の待ち受けポート: '}
+                                <strong>127.0.0.1:{httpServerInfo.port}</strong>
+                                {httpServerInfo.port !== httpServerInfo.preferredPort && (
+                                    <>
+                                        {language === 'en'
+                                            ? ` (preferred port ${httpServerInfo.preferredPort} is busy, so another port is in use)`
+                                            : `（優先ポート ${httpServerInfo.preferredPort} は使用中のため、別ポートを使用しています）`}
+                                    </>
+                                )}
+                            </>
+                        ) : (
+                            <>
+                                {language === 'en' ? 'Could not start the HTTP server: ' : 'HTTPサーバーを起動できませんでした: '}
+                                {httpServerInfo.error || 'unknown error'}
+                            </>
+                        )}
+                    </p>
+                )}
+
+                <p style={{ fontSize: 'var(--font-size-sub)', lineHeight: 1.5, color: '#f59e0b', marginBottom: '0.6rem' }}>
+                    {language === 'en' ? '⚠ Restart the desktop app after saving to apply port changes.' : '⚠ 変更を反映するには、設定を保存してからデスクトップアプリ版を再起動してください。'}
                 </p>
                 <details style={{ fontSize: 'var(--font-size-sub)', color: 'var(--text-muted)' }}>
-                    <summary style={{ cursor: 'pointer', marginBottom: '0.4rem' }}>{language === 'en' ? '🔧 What is a port?' : '🔧 ポートとは？'}</summary>
+                    <summary style={{ cursor: 'pointer', fontWeight: 600, lineHeight: 1.5, marginBottom: '0.4rem' }}>{language === 'en' ? '🔧 What is a port?' : '🔧 ポートとは？'}</summary>
                     <p style={{ marginTop: '0.4rem', lineHeight: 1.6 }}>
                         {language === 'en'
-                            ? <>A Port is an "entryway" number through which apps communicate on your computer.<br />The GBF AF Manager Desktop App "listens" for data on this port when started,<br />and the AF Collector Chrome Extension sends data to this port.<br />Only change this if it conflicts with another application's port number.</>
-                            : <>ポート（Port）とは、コンピュータ内でアプリ同士が通信するための「窓口番号」です。<br />GBF AF Managerアプリ（デスクトップ版）は起動時にこの番号で通信待受を開始し、<br />ブラウザ拡張機能（AF Collector）がこの番号宛てにデータを送信します。<br />別のアプリと番号が被る（ポート競合）場合のみ変更してください。</>}
+                            ? 'A port is a numbered communication endpoint that apps use on the same computer. The GBF AF Manager desktop app listens on this port for data from AF Collector, and AF Collector sends data to the port that the desktop app is actually using.'
+                            : 'ポートは、同じコンピュータ内でアプリ同士が通信するための番号付きの窓口です。GBF AF Manager（デスクトップ版）はこのポートでAF Collectorからのデータを待ち受け、AF Collectorは実際に使用中のポートへデータを送信します。'}
+                    </p>
+                    <p style={{ marginTop: '0.6rem', lineHeight: 1.6 }}>
+                        <strong>{language === 'en' ? 'Internal processing details' : '内部処理の詳細'}</strong>
+                        <br />
+                        {language === 'en'
+                            ? 'When auto fallback is ON, the desktop app tries the preferred port first, then 1422-1432. If none are available, it uses a port assigned by the operating system. AF Collector checks /api/ping to find the port that the desktop app is actually listening on.'
+                            : '自動フォールバックがONの場合、GBF AF Managerは優先ポートを最初に試し、使用中なら1422〜1432を順に試します。それでも空きがない場合は、OSが自動的に割り当てたポートを使用します。AF Collectorは /api/ping で実際に待ち受けているポートを確認して接続します。'}
+                    </p>
+                    <p style={{ marginTop: '0.6rem', lineHeight: 1.6 }}>
+                        <strong>{language === 'en' ? 'AF Collector v1.1.2 and earlier' : 'v1.1.2以前のAF Collectorとの互換性'}</strong>
+                        <br />
+                        {language === 'en'
+                            ? 'AF Collector versions v1.1.2 and earlier are fixed to port 1422 and cannot follow a fallback to another port. If the app uses another port, switch to AF Collector, or turn off auto fallback and keep port 1422 free. When using a fixed port outside 1422-1432, set the same port in AF Collector\'s connection options.'
+                            : 'v1.1.2以前のAF Collectorは1422固定のため、別ポートへのフォールバックには追従できません。別ポートで待ち受ける場合は、最新版のAF Collectorに切り替えるか、自動フォールバックをOFFにして1422を空けてください。1422〜1432外の固定ポートを使用する場合は、AF Collectorの接続設定で同じポートを指定してください。'}
                     </p>
                 </details>
             </div>
@@ -2277,7 +2300,7 @@ export default function SettingsTab() {
 
             <div style={{ marginTop: '2rem', padding: '1rem', borderTop: '1px solid var(--panel-border)', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'calc(var(--font-size-sub) * 0.9)' }}>
                 <p style={{ margin: '0 0 0.5rem 0' }}>{language === 'en' ? 'Credits & Open Source Licenses' : 'クレジット・オープンソースライセンス'}</p>
-                <p style={{ margin: 0 }}>UI Icons by Lucide Contributors (ISC License) / Weapon Icons based on FontAwesome Free (CC BY 4.0)</p>
+                <p style={{ margin: 0 }}>UI Icons by Lucide Contributors (ISC License)</p>
             </div>
         </div>
     );

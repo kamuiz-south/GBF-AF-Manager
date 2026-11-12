@@ -1,25 +1,52 @@
-import React, { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db';
 import { useTranslation } from '../i18n';
 import { useAppStore } from '../store/useAppStore';
 import { Trash2, History, ChevronRight, ChevronDown, Calendar } from 'lucide-react';
-import type { AppArtifact } from '../types';
+import type { AppArtifact, Condition, UpgradeLogEntry } from '../types';
 import { translateSkill } from '../utils/skillMapping';
+import { DEFAULT_SETTINGS, DEFAULT_UPGRADE_LOG_MAX_COUNT } from '../data/defaultSettings';
+import CollapsibleSection from './CollapsibleSection';
 
 const ATTR_MAP: Record<string, string> = { '1': '火', '2': '水', '3': '土', '4': '風', '5': '光', '6': '闇' };
 const ATTR_MAP_EN: Record<string, string> = { '1': 'Fire', '2': 'Water', '3': 'Earth', '4': 'Wind', '5': 'Light', '6': 'Dark' };
 const KIND_MAP: Record<string, string> = { '1': '剣', '2': '短剣', '3': '槍', '4': '斧', '5': '杖', '6': '銃', '7': '格闘', '8': '弓', '9': '楽器', '10': '刀' };
 const KIND_MAP_EN: Record<string, string> = { '1': 'Sabre', '2': 'Dagger', '3': 'Spear', '4': 'Axe', '5': 'Staff', '6': 'Gun', '7': 'Melee', '8': 'Bow', '9': 'Harp', '10': 'Katana' };
 
-const Section = ({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) => (
-    <div className="glass-panel" style={{ padding: '1.5rem' }}>
-        <h3 style={{ fontSize: 'var(--font-size-main)', color: 'var(--accent-gold)', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', paddingBottom: '0.6rem', borderBottom: '1px solid var(--panel-border)' }}>
-            {icon} {title}
-        </h3>
-        {children}
-    </div>
-);
+// 更新前後で共通のAFは差分ではないため、既定では両側から除外する。
+// 設定で「更新項目の確保AFをすべて表示」がONの場合は除外しない。
+function getChangedArtifacts(entry: UpgradeLogEntry) {
+    const oldIds = new Set(entry.oldArtifacts.map(af => af.id));
+    const newIds = new Set(entry.newArtifacts.map(af => af.id));
+    return {
+        oldArtifacts: entry.oldArtifacts.filter(af => !newIds.has(af.id)),
+        newArtifacts: entry.newArtifacts.filter(af => !oldIds.has(af.id)),
+        commonIds: new Set([...oldIds].filter(id => newIds.has(id))),
+    };
+}
+
+type DisplayUpgradeLogEntry = UpgradeLogEntry & {
+    keptCount: number;
+    resolvedTargetCount?: number;
+    commonIds: Set<number>;
+};
+
+const EMPTY_IDS = new Set<number>();
+
+function resolveTargetCount(entry: UpgradeLogEntry, condition?: Condition): number | undefined {
+    if (entry.targetCount !== undefined) return entry.targetCount;
+    if (!condition) return undefined;
+
+    const isMethod2 =
+        entry.methodType === 2 ||
+        (entry.methodType === undefined &&
+            (entry.characterName !== undefined || condition.methodType === 2));
+
+    return isMethod2
+        ? condition.targetCountMethod2
+        : condition.targetCount?.[`${entry.attribute}_${entry.weaponKind}`];
+}
 
 export default function UpgradeLogHistory() {
     const { language } = useTranslation();
@@ -27,7 +54,34 @@ export default function UpgradeLogHistory() {
     const showToast = useAppStore(state => state.showToast);
 
     // ログ表示用ステート
-    const upgradeLogs = useLiveQuery(() => db.upgradeLogs.orderBy('timestamp').reverse().toArray()) || [];
+    const upgradeLogsResult = useLiveQuery(() => db.upgradeLogs.orderBy('timestamp').reverse().toArray());
+    const upgradeLogs = useMemo(() => upgradeLogsResult ?? [], [upgradeLogsResult]);
+    const conditionsResult = useLiveQuery(() => db.conditions.toArray());
+    const conditions = useMemo(() => conditionsResult ?? [], [conditionsResult]);
+    const conditionMap = useMemo(
+        () => new Map(conditions.map(condition => [condition.id, condition])),
+        [conditions]
+    );
+    const showAllArtifacts = globalSettings?.upgradeLogShowAllArtifacts ?? false;
+
+    // ログ更新時だけ差分を計算する（折りたたみ操作などの再レンダーでは再計算しない）
+    const displayLogs = useMemo(
+        () => upgradeLogs.map(log => ({
+            ...log,
+            entries: log.entries.map(entry => {
+                const changed = getChangedArtifacts(entry);
+                return {
+                    ...entry,
+                    oldArtifacts: showAllArtifacts ? entry.oldArtifacts : changed.oldArtifacts,
+                    newArtifacts: showAllArtifacts ? entry.newArtifacts : changed.newArtifacts,
+                    keptCount: entry.newKeptCount ?? entry.newArtifacts.length,
+                    resolvedTargetCount: resolveTargetCount(entry, conditionMap.get(entry.conditionId)),
+                    commonIds: showAllArtifacts ? changed.commonIds : EMPTY_IDS,
+                } as DisplayUpgradeLogEntry;
+            }),
+        })),
+        [upgradeLogs, showAllArtifacts, conditionMap]
+    );
     const [expandedLogs, setExpandedLogs] = useState<Record<number, boolean>>({});
     const [expandedConditions, setExpandedConditions] = useState<Record<string, boolean>>({});
     const [expandedEntries, setExpandedEntries] = useState<Record<string, boolean>>({});
@@ -35,14 +89,17 @@ export default function UpgradeLogHistory() {
 
     const updateLogMaxCount = async (maxCount: number) => {
         const latest = await db.settings.get('global');
-        if (latest) {
-            await db.settings.put({ ...latest, upgradeLogMaxCount: maxCount });
-            const allLogs = await db.upgradeLogs.orderBy('timestamp').toArray();
-            if (allLogs.length > maxCount) {
-                const toDelete = allLogs.slice(0, allLogs.length - maxCount);
-                await db.upgradeLogs.bulkDelete(toDelete.map(l => l.id!));
-            }
+        await db.settings.put({ ...(latest ?? DEFAULT_SETTINGS), upgradeLogMaxCount: maxCount });
+        const allLogs = await db.upgradeLogs.orderBy('timestamp').toArray();
+        if (allLogs.length > maxCount) {
+            const toDelete = allLogs.slice(0, allLogs.length - maxCount);
+            await db.upgradeLogs.bulkDelete(toDelete.map(l => l.id!));
         }
+    };
+
+    const updateShowAllArtifacts = async (showAll: boolean) => {
+        const latest = await db.settings.get('global');
+        await db.settings.put({ ...(latest ?? DEFAULT_SETTINGS), upgradeLogShowAllArtifacts: showAll });
     };
 
     const formatDateTime = (isoString: string) => {
@@ -57,9 +114,9 @@ export default function UpgradeLogHistory() {
         }
     };
 
-    const renderCompactAF = (af: AppArtifact, isOld: boolean, otherList: AppArtifact[], isMethod2: boolean) => {
-        const isDiff = !otherList.some(o => o.id === af.id);
-        const diffClass = isDiff ? (isOld ? 'diff-old' : 'diff-new') : 'diff-none';
+    const renderCompactAF = (af: AppArtifact, isOld: boolean, isMethod2: boolean, isCommon: boolean = false) => {
+        // 共通AFを全表示する場合は、更新前後のどちらにも存在するため中立色にする。
+        const diffClass = isCommon ? 'diff-none' : (isOld ? 'diff-old' : 'diff-new');
 
         const skills = [af.skill1_info, af.skill2_info, af.skill3_info, af.skill4_info].filter(Boolean);
         const q5Outline = '0px 0px 3px var(--max-quality-outline), -1px -1px 0 var(--max-quality-outline), 1px -1px 0 var(--max-quality-outline), -1px 1px 0 var(--max-quality-outline), 1px 1px 0 var(--max-quality-outline)';
@@ -109,16 +166,33 @@ export default function UpgradeLogHistory() {
 
     return (
         <>
-        <Section title={language === 'en' ? 'Keep AF Upgrade History' : '確保AF更新履歴'} icon={<History size={18} />}>
+        <CollapsibleSection id="upgrade-log-history" title={language === 'en' ? 'Keep AF Upgrade History' : '確保AF更新履歴'} icon={<History size={18} />}>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1.2rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap', gap: '1.5rem', rowGap: '0.6rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{ fontSize: 'var(--font-size-sub)' }}>
+                            {language === 'en' ? 'Show all kept AFs in changes:' : '更新項目の確保AFをすべて表示:'}
+                        </span>
+                        <div className="settings-toggle-group">
+                            <button
+                                className={`btn ${showAllArtifacts ? 'btn-primary' : 'btn-ghost'}`}
+                                style={{ padding: '0.2rem 0.7rem', minWidth: '52px', borderRadius: '6px', fontSize: 'var(--font-size-sub)', ...(showAllArtifacts ? {} : { color: 'var(--text-muted)' }) }}
+                                onClick={() => updateShowAllArtifacts(true)}
+                            >ON</button>
+                            <button
+                                className={`btn ${!showAllArtifacts ? 'settings-toggle-btn-off-active' : 'btn-ghost'}`}
+                                style={{ padding: '0.2rem 0.7rem', minWidth: '52px', borderRadius: '6px', fontSize: 'var(--font-size-sub)', ...(!showAllArtifacts ? {} : { color: 'var(--text-muted)' }) }}
+                                onClick={() => updateShowAllArtifacts(false)}
+                            >OFF</button>
+                        </div>
+                    </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <span style={{ fontSize: 'var(--font-size-sub)' }}>
                             {language === 'en' ? 'Max Logs:' : '最大保持件数:'}
                         </span>
                         <input
                             type="number" min={1} max={200}
-                            value={tempMaxCount !== null ? tempMaxCount : (globalSettings?.upgradeLogMaxCount ?? 20)}
+                            value={tempMaxCount !== null ? tempMaxCount : (globalSettings?.upgradeLogMaxCount ?? DEFAULT_UPGRADE_LOG_MAX_COUNT)}
                             className="input"
                             style={{ width: '60px', padding: '0.2rem 0.4rem', textAlign: 'center', fontSize: 'var(--font-size-sub)' }}
                             onChange={e => {
@@ -127,7 +201,7 @@ export default function UpgradeLogHistory() {
                             onBlur={e => {
                                 const val = parseInt(e.target.value);
                                 if (!val || val < 1) {
-                                    setTempMaxCount(globalSettings?.upgradeLogMaxCount?.toString() ?? '20');
+                                    setTempMaxCount(globalSettings?.upgradeLogMaxCount?.toString() ?? String(DEFAULT_UPGRADE_LOG_MAX_COUNT));
                                     return;
                                 }
                                 const current = upgradeLogs.length;
@@ -135,7 +209,7 @@ export default function UpgradeLogHistory() {
                                     const willDelete = current - val;
                                     const ok = confirm(language === 'en' ? `This will delete ${willDelete} oldest log(s) to fit the new limit. Continue?` : `上限を変更すると古いログ${willDelete}件が削除されます。続行しますか？`);
                                     if (!ok) {
-                                        setTempMaxCount(globalSettings?.upgradeLogMaxCount?.toString() ?? '20');
+                                        setTempMaxCount(globalSettings?.upgradeLogMaxCount?.toString() ?? String(DEFAULT_UPGRADE_LOG_MAX_COUNT));
                                         return;
                                     }
                                 }
@@ -167,7 +241,7 @@ export default function UpgradeLogHistory() {
                 </div>
             ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    {upgradeLogs.map(log => {
+                    {displayLogs.map(log => {
                         const isLogExpanded = !!expandedLogs[log.id!];
                         const condGroups: Record<string, typeof log.entries> = {};
                         for (const entry of log.entries) {
@@ -248,6 +322,11 @@ export default function UpgradeLogHistory() {
                                                                             {isEntryExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                                                                             <span style={{ fontSize: 'calc(var(--font-size-sub) * 0.95)', fontWeight: 600, color: 'var(--text-main)' }}>
                                                                                 {entryLabel}
+                                                                                <span style={{ marginLeft: '0.5rem', fontSize: 'calc(var(--font-size-sub) * 0.88)', fontWeight: 400, color: 'var(--text-muted)' }}>
+                                                                                    {language === 'en'
+                                                                                        ? `(Kept: ${entry.keptCount}/${entry.resolvedTargetCount ?? '?'})`
+                                                                                        : `（確保数：${entry.keptCount}/${entry.resolvedTargetCount ?? '?'}）`}
+                                                                                </span>
                                                                             </span>
                                                                         </div>
                                                                         {isEntryExpanded && (
@@ -259,7 +338,7 @@ export default function UpgradeLogHistory() {
                                                                                     {entry.oldArtifacts.length === 0 ? (
                                                                                         <div className="upgrade-log-empty-slot">(None)</div>
                                                                                     ) : (
-                                                                                        entry.oldArtifacts.map(af => renderCompactAF(af, true, entry.newArtifacts, isMethod2))
+                                                                                        entry.oldArtifacts.map(af => renderCompactAF(af, true, isMethod2, entry.commonIds.has(af.id)))
                                                                                     )}
                                                                                 </div>
                                                                                 <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -269,7 +348,7 @@ export default function UpgradeLogHistory() {
                                                                                     {entry.newArtifacts.length === 0 ? (
                                                                                         <div className="upgrade-log-empty-slot">(None)</div>
                                                                                     ) : (
-                                                                                        entry.newArtifacts.map(af => renderCompactAF(af, false, entry.oldArtifacts, isMethod2))
+                                                                                        entry.newArtifacts.map(af => renderCompactAF(af, false, isMethod2, entry.commonIds.has(af.id)))
                                                                                     )}
                                                                                 </div>
                                                                             </div>
@@ -289,7 +368,7 @@ export default function UpgradeLogHistory() {
                     })}
                 </div>
             )}
-        </Section>
+        </CollapsibleSection>
         <div style={{ height: '750px' }} />
         </>
     );

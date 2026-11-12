@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { AppArtifact, Settings } from '../types';
+import { DEFAULT_NOTIFICATION_DURATION, DEFAULT_NOTIFICATION_MAX_COUNT } from '../data/defaultSettings';
 
 export interface ToastItem {
     id: string;
@@ -50,8 +51,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     showToast: (message, type = 'info', duration?) => {
         const state = get();
         const settings = state.globalSettings;
-        const durationMs = duration ?? ((settings?.notificationDuration ?? 3) * 1000);
-        const maxCount = settings?.notificationMaxCount ?? 1;
+        const durationMs = duration ?? ((settings?.notificationDuration ?? DEFAULT_NOTIFICATION_DURATION) * 1000);
+        const maxCount = settings?.notificationMaxCount ?? DEFAULT_NOTIFICATION_MAX_COUNT;
 
         const id = Math.random().toString(36).substr(2, 9);
 

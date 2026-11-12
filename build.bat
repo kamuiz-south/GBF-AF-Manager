@@ -24,13 +24,24 @@ if exist "%RELEASE_DIR%\GBF_AF_Manager.exe" (
     del /q "%RELEASE_DIR%\GBF_AF_Manager.exe"
 )
 
-echo [1/3] Building Frontend and Tauri App...
+echo [1/3] Building Frontend and Tauri Bundles...
 cd af-manager
 call npx tauri build
 
 if %ERRORLEVEL% NEQ 0 (
     echo.
-    echo [ERROR] Build failed. Please check the logs above.
+    echo [ERROR] Installer build failed. Please check the logs above.
+    pause
+    exit /b %ERRORLEVEL%
+)
+
+echo.
+echo   - Building Portable Binary (features: portable)...
+call npx tauri build --no-bundle --features portable
+
+if %ERRORLEVEL% NEQ 0 (
+    echo.
+    echo [ERROR] Portable build failed. Please check the logs above.
     pause
     exit /b %ERRORLEVEL%
 )
@@ -56,7 +67,7 @@ if not exist "%OUT_DIR%" mkdir "%OUT_DIR%"
 echo   - Creating Installer ZIP (MSI and NSIS)...
 powershell -NoProfile -Command "Compress-Archive -Path '%BUNDLE_MSI_DIR%\*.msi', '%BUNDLE_NSIS_DIR%\*.exe' -DestinationPath '%OUT_DIR%\GBF_AF_Manager_installer_%MGR_VERSION%.zip' -Force"
 
-:: 2. Portable ZIP (contains standalone .exe)
+:: 2. Portable ZIP (contains standalone .exe with portable feature)
 echo   - Creating Portable ZIP...
 powershell -NoProfile -Command "Compress-Archive -Path '%RELEASE_DIR%\GBF_AF_Manager.exe' -DestinationPath '%OUT_DIR%\GBF_AF_Manager_portable_%MGR_VERSION%.zip' -Force"
 

@@ -6,18 +6,10 @@ import { SKILL_EFFECT_DATA } from '../data/skillEffectData';
 import { translateSkill } from '../utils/skillMapping';
 import { useLiveQuery } from 'dexie-react-hooks';
 import UpgradeLogHistory from '../components/UpgradeLogHistory';
+import CollapsibleSection from '../components/CollapsibleSection';
 import { db } from '../db';
 import { ATTRIBUTE_IDS, KIND_IDS, getKindNamesShort } from '../data/constants';
 import WeaponIcon from '../components/WeaponIcon';
-
-const Section = ({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) => (
-    <div className="glass-panel" style={{ padding: '1.5rem' }}>
-        <h3 style={{ fontSize: 'var(--font-size-main)', color: 'var(--accent-gold)', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', paddingBottom: '0.6rem', borderBottom: '1px solid var(--panel-border)' }}>
-            {icon} {title}
-        </h3>
-        {children}
-    </div>
-);
 
 const DotCheckbox = ({ label, checked, onChange }: { label: string; checked: boolean; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void }) => (
     <label className="dot-checkbox-container">
@@ -115,7 +107,7 @@ export default function ReferenceTab() {
             </header>
 
             {/* Skill Effect Values Section */}
-            <Section title={language === 'en' ? 'Skill Effect Values' : 'スキル効果量表'} icon={<FileText size={18} />}>
+            <CollapsibleSection id="skill-effects" title={language === 'en' ? 'Skill Effect Values' : 'スキル効果量表'} icon={<FileText size={18} />}>
                 <div style={{ marginBottom: '1.5rem' }}>
                     <div style={{ position: 'relative', width: '100%', maxWidth: '650px' }}>
                         <select
@@ -192,10 +184,10 @@ export default function ReferenceTab() {
                         </tbody>
                     </table>
                 </div>
-            </Section>
+            </CollapsibleSection>
 
             {/* Owned Artifact Counts Section */}
-            <Section title={language === 'en' ? 'Owned Artifact Counts' : '所持アーティファクト個数'} icon={<Boxes size={18} />}>
+            <CollapsibleSection id="owned-artifact-counts" title={language === 'en' ? 'Owned Artifact Counts' : '所持アーティファクト個数'} icon={<Boxes size={18} />}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.5rem', marginBottom: '0.6rem', background: 'rgba(255,255,255,0.03)', padding: '0.6rem 1rem', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
                     <DotCheckbox label={language === 'en' ? 'All' : 'すべて'} checked={filters.has('all')} onChange={() => handleFilterChange('all')} />
                     <DotCheckbox label={language === 'en' ? 'Favorite' : 'お気に入り'} checked={filters.has('fav')} onChange={() => handleFilterChange('fav')} />
@@ -222,7 +214,7 @@ export default function ReferenceTab() {
                                         minWidth: '40px'
                                     }}>
                                         {globalSettings?.design?.useWeaponIconsInTables && !isTransposed ? (
-                                            <WeaponIcon kind={labelObj.id} size="1.5em" style={{ verticalAlign: 'middle', color: 'var(--text-main)' }} />
+                                            <WeaponIcon kind={labelObj.id} size="1.5em" style={{ verticalAlign: 'middle', color: 'var(--text-main)' }} label={labelObj.label} />
                                         ) : (
                                             labelObj.label
                                         )}
@@ -240,7 +232,7 @@ export default function ReferenceTab() {
                                     <tr key={rowObj.id} style={{ background: rIdx % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent' }}>
                                         <td style={{ border: '1px solid var(--panel-border)', padding: '0.6rem', fontWeight: 600, color: 'var(--text-main)', background: 'var(--dim-bg)' }}>
                                             {globalSettings?.design?.useWeaponIconsInTables && isTransposed ? (
-                                                <WeaponIcon kind={rowObj.id} size="1.5em" style={{ verticalAlign: 'middle', color: 'var(--text-main)' }} />
+                                                <WeaponIcon kind={rowObj.id} size="1.5em" style={{ verticalAlign: 'middle', color: 'var(--text-main)' }} label={rowObj.label} />
                                             ) : (
                                                 rowObj.label
                                             )}
@@ -297,7 +289,7 @@ export default function ReferenceTab() {
                         <ArrowUpDown size={14} /> {language === 'en' ? 'Swap Axes' : '縦軸と横軸を入れ替える'}
                     </button>
                 </div>
-            </Section>
+            </CollapsibleSection>
 
             <UpgradeLogHistory />
 

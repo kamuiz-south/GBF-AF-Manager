@@ -17,7 +17,8 @@ import { runDiscardCalc } from './utils/discardCalc';
 import { alertUnnecessaryKeeps } from './utils/alertUnnecessaryKeeps';
 import { saveKeepFlagSnapshot, generateUpgradeLog } from './utils/upgradeLogger';
 import { useAppStore } from './store/useAppStore';
-import { DEFAULT_DESIGN, type AppDesignSettings } from './types';
+import { DEFAULT_DESIGN, type AppDesignSettings, type Settings } from './types';
+import { applyDesignToDocument, resolveDesign } from './utils/applyDesign';
 import { useGlobalDataReceiver } from './hooks/useGlobalDataReceiver';
 import { useTranslation } from './i18n';
 
@@ -26,11 +27,11 @@ function TabZoomOverlay({ design, tabZoom, onAdjustZoom }: { design: AppDesignSe
   if (!design.showTabZoomControls) return null;
   return (
     <div style={{ position: 'absolute', top: '0.6rem', right: '0.8rem', zIndex: 50, display: 'flex', alignItems: 'center', gap: '0.3rem', background: 'var(--panel-bg)', border: '1px solid var(--panel-border)', borderRadius: '8px', padding: '0.3rem 0.6rem', backdropFilter: 'blur(8px)', opacity: 0.8 }}>
-      <button onClick={() => onAdjustZoom(-0.1)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', padding: '2px' }} title="タブを縮小">
+      <button onClick={() => onAdjustZoom(-0.05)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', padding: '2px' }} title="タブを縮小">
         <ZoomOut size={15} />
       </button>
       <span style={{ fontSize: 'calc(var(--font-size-sub) * 0.94)', color: 'var(--text-muted)', minWidth: '2.5rem', textAlign: 'center' }}>{Math.round(tabZoom * 100)}%</span>
-      <button onClick={() => onAdjustZoom(+0.1)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', padding: '2px' }} title="タブを拡大">
+      <button onClick={() => onAdjustZoom(+0.05)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', padding: '2px' }} title="タブを拡大">
         <ZoomIn size={15} />
       </button>
     </div>
@@ -76,11 +77,12 @@ async function handleDiscardCalc(language: string) {
 }
 
 
-function AppInner() {
+function AppInner({ initialSettings }: { initialSettings?: Settings }) {
   const { t, language } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const settingsQuery = useLiveQuery(() => db.settings.get('global'));
+  const dbSettings = settingsQuery ?? initialSettings;
 
   const mainRef = useRef<HTMLElement>(null);
   const scrollMap = useRef<Record<string, number>>({});
@@ -94,10 +96,10 @@ function AppInner() {
 
   // Sync settings to store
   useEffect(() => {
-    if (settingsQuery) {
-      setGlobalSettings(settingsQuery);
+    if (dbSettings) {
+      setGlobalSettings(dbSettings);
     }
-  }, [settingsQuery, setGlobalSettings]);
+  }, [dbSettings, setGlobalSettings]);
 
   // Preserve scroll state
   useLayoutEffect(() => {
@@ -112,27 +114,17 @@ function AppInner() {
   };
 
   // Apply design settings from DB to DOM
-  const dbSettings = useLiveQuery(() => db.settings.get('global'));
   useEffect(() => {
-    const d = { ...DEFAULT_DESIGN, ...(dbSettings?.design ?? {}) };
-    const root = document.documentElement;
-    root.style.setProperty('--font-size-main', `${d.fontSizeMain}px`);
-    root.style.setProperty('--font-size-sub', `${d.fontSizeSub}px`);
-    root.style.setProperty('--font-family-main', d.fontFamilyMain || "'Inter', 'Segoe UI', system-ui, sans-serif");
-    root.style.setProperty('--font-family-sub', d.fontFamilySub || "'Inter', 'Segoe UI', system-ui, sans-serif");
-    root.style.setProperty('--app-zoom', String(d.zoom));
-    if (d.theme === 'light') {
-      document.body.classList.add('theme-light');
-    } else {
-      document.body.classList.remove('theme-light');
-    }
+    applyDesignToDocument(resolveDesign(dbSettings?.design));
   }, [dbSettings?.design]);
 
-  const currentDesign = { ...DEFAULT_DESIGN, ...(dbSettings?.design ?? {}) };
+  const currentDesign = resolveDesign(dbSettings?.design);
   const updateDesign = async (patch: Partial<AppDesignSettings>) => {
-    const newDesign = { ...currentDesign, ...patch };
     const current = await db.settings.get('global');
-    if (current) await db.settings.put({ ...current, design: newDesign });
+    if (current) {
+      const design = { ...DEFAULT_DESIGN, ...(current.design ?? {}), ...patch };
+      await db.settings.put({ ...current, design });
+    }
   };
 
   const currentTabZoom = currentDesign.tabZoom[location.pathname] ?? 1;
@@ -224,10 +216,12 @@ function AppInner() {
             <Filter size={22} style={{ flexShrink: 0 }} />
             <span className="nav-text">{t('TAB_CRITERIA', '確保AF条件')}</span>
           </NavLink>
+          <div className="nav-separator" aria-hidden="true" />
           <NavLink to="/settings" onClick={(e) => handleNavClick(e, '/settings')} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''} ${collapsed ? 'collapsed' : ''}`} title={t('TAB_SETTINGS', '設定')}>
             <SettingsIcon size={22} style={{ flexShrink: 0 }} />
             <span className="nav-text">{t('TAB_SETTINGS', '設定')}</span>
           </NavLink>
+          <div className="nav-separator" aria-hidden="true" />
           <NavLink to="/help" onClick={(e) => handleNavClick(e, '/help')} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''} ${collapsed ? 'collapsed' : ''}`} title={language === 'en' ? 'How to use' : '使い方'}>
             <BookOpen size={22} style={{ flexShrink: 0 }} />
             <span className="nav-text">{language === 'en' ? 'How to use' : '使い方'}</span>
@@ -296,11 +290,11 @@ function AppInner() {
           opacity: collapsed ? 0 : 0.7, height: '12px',
           transition: 'opacity 0.22s ease'
         }}>
-          v{import.meta.env.VITE_APP_VERSION || '1.1.2'}
+          v{import.meta.env.VITE_APP_VERSION || '1.1.3'}
         </div>
       </aside>
 
-      <main className="main-content" ref={mainRef} onScroll={handleScroll} style={{ position: 'relative', overflowX: 'hidden' }}>
+      <main className="main-content" ref={mainRef} onScroll={handleScroll} style={{ position: 'relative', overflowX: 'auto' }}>
         {/* Toast Overlay - Multi-stack */}
         <div className="toast-container">
           {useAppStore(state => state.toasts).map((toast: ToastItem) => (
@@ -314,12 +308,7 @@ function AppInner() {
         </div>
 
         <TabZoomOverlay design={currentDesign} tabZoom={currentTabZoom} onAdjustZoom={handleAdjustTabZoom} />
-        <div style={{ 
-          transform: currentTabZoom !== 1 ? `scale(${currentTabZoom})` : 'none', 
-          transformOrigin: 'top center', 
-          transition: currentTabZoom !== 1 ? 'transform 0.2s' : 'none', 
-          minHeight: '100%' 
-        }}>
+        <div style={{ zoom: currentTabZoom }}>
           {(location.pathname === '/' || location.pathname === '/data') && <Navigate to="/data" replace />}
           {currentDesign.enableTabPersistence ? (
             <>
@@ -349,10 +338,10 @@ function AppInner() {
 }
 
 
-function App() {
+function App({ initialSettings }: { initialSettings?: Settings }) {
   return (
     <HashRouter>
-      <AppInner />
+      <AppInner initialSettings={initialSettings} />
     </HashRouter>
   );
 }

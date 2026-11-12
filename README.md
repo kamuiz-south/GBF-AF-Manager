@@ -126,9 +126,9 @@ npx tauri build
 
 - **自己責任**: 本ツールを利用したことで発生したいかなる不利益についても、開発者は一切の責任を負いません。
 - **License**: 本プロジェクトは [MIT License](./LICENSE) の下で公開されています。商用・非商用を問わず、自由に利用、改変、再配布が可能です。
-- **Credits**: 本ツールの一部アイコンは以下のオープンソースアセットを使用しています。
+- **Credits**:
   - UI Icons by Lucide Contributors (ISC License)
-  - Weapon Icons based on FontAwesome Free (CC BY 4.0 License)
+  - 武器アイコン: v1.1.2以前は [game-icons.net](https://game-icons.net/)（Lorc / Delapouite / John Colburn、CC BY 3.0）、v1.1.3以降はオリジナル手描き。
 - **Cygames社の権利について**: 本プロジェクトには、株式会社Cygames様の権利に帰属する画像・音声等のゲーム内アセットは一切含まれていません。本ツールは非公式のユーザー制作ツールであり、公式の運営とは一切関係ありません。
 
 ---

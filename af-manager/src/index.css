@@ -12,6 +12,8 @@
   --accent-blue: #3b82f6;
   --accent-blue-hover: #60a5fa;
   --accent-gold: #fbbf24;
+  /* Keep favorite tags on the same bright gold in both themes. */
+  --favorite-tag-bg: #fbbf24;
   --accent-purple: #8b5cf6;
   --accent-danger: #ef4444;
   --accent-success: #10b981;
@@ -61,8 +63,8 @@
   /* Darker red */
   --accent-success: #059669;
   /* Darker green */
-  --max-quality-text: #5D158A;
-  --max-quality-outline: #E3B7FF;
+  --max-quality-text: #7C3AED;
+  --max-quality-outline: #F3E8FF;
   --glass-blur: blur(16px);
   --focus-ring: 0 0 0 2px rgba(37, 99, 235, 0.4);
   --dim-bg: #f1f5f9;
@@ -133,7 +135,7 @@ body {
 .main-content {
   flex: 1;
   overflow-y: auto;
-  padding: 2rem;
+  padding: 1rem;
   position: relative;
   /* サイドバーのアニメーションによる backdrop-filter ゴーストアーティファクトを防ぐ
      独立した GPU 合成レイヤーを確立し、再描画を隔離する */
@@ -378,6 +380,14 @@ select.input optgroup {
 
 .nav-link.collapsed {
   justify-content: flex-start;
+}
+
+.nav-separator {
+  height: 1px;
+  margin: 0.35rem 6px;
+  background: var(--panel-border);
+  opacity: 0.45;
+  flex-shrink: 0;
 }
 
 .nav-text {
